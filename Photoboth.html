@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photobooth Modern</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&family=Satisfy&display=swap');
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #0f172a; /* slate-900 */
+            color: #f8fafc;
+            overflow-x: hidden;
+        }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        #camera-feed {
+            transform: scaleX(-1); /* Mirror effect for natural feel */
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 0.75rem;
+        }
+
+        .flash-animation {
+            animation: flash 0.5s ease-out;
+        }
+
+        @keyframes flash {
+            0% { background-color: rgba(255, 255, 255, 1); }
+            100% { background-color: rgba(255, 255, 255, 0); }
+        }
+
+        .countdown-text {
+            text-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            animation: pop 1s infinite;
+        }
+
+        @keyframes pop {
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            50% { transform: translate(-50%, -50%) scale(1.5); opacity: 0.8; }
+            100% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
+        }
+
+        .filter-btn.active {
+            border-color: #3b82f6; /* blue-500 */
+            background-color: rgba(59, 130, 246, 0.2);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b; 
+        }
+        
+        #final-strip {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="p-6 text-center glass-panel sticky top-0 z-20">
+        <h1 class="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
+            <i class="fas fa-camera-retro mr-2 text-blue-400"></i>Studio Booth
+        </h1>
+        <p class="text-gray-400 text-sm mt-1">Abadikan momen terbaikmu</p>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col lg:flex-row p-4 md:p-6 gap-6 max-w-7xl w-full mx-auto relative">
+        
+        <!-- Left Column: Camera & Controls -->
+        <section class="flex-1 flex flex-col gap-4 relative">
+            
+            <!-- Camera Container -->
+            <div class="relative w-full aspect-[3/4] md:aspect-video bg-black rounded-xl overflow-hidden shadow-2xl border border-gray-700">
+                <video id="camera-feed" autoplay playsinline></video>
+                
+                <!-- Flash Overlay -->
+                <div id="flash-overlay" class="absolute inset-0 pointer-events-none z-10"></div>
+                
+                <!-- Countdown Overlay -->
+                <div id="countdown-display" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-8xl font-bold text-white hidden z-20 countdown-text">
+                    3
+                </div>
+
+                <!-- Camera Error Message -->
+                <div id="camera-error" class="absolute inset-0 flex flex-col items-center justify-center text-center p-6 bg-gray-900 hidden z-30">
+                    <i class="fas fa-video-slash text-5xl text-red-500 mb-4"></i>
+                    <h3 class="text-xl font-bold mb-2">Kamera Tidak Ditemukan</h3>
+                    <p class="text-gray-400 text-sm">Pastikan Anda telah memberikan izin akses kamera pada browser.</p>
+                    <button onclick="initCamera()" class="mt-4 px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-full transition-colors">
+                        Coba Lagi
+                    </button>
+                </div>
+                
+                <!-- Progress Indicator (Dots) -->
+                <div id="progress-dots" class="absolute top-4 left-0 right-0 flex justify-center gap-3 z-10 hidden">
+                    <div class="w-3 h-3 rounded-full bg-white opacity-40 border border-gray-400 dot-1"></div>
+                    <div class="w-3 h-3 rounded-full bg-white opacity-40 border border-gray-400 dot-2"></div>
+                    <div class="w-3 h-3 rounded-full bg-white opacity-40 border border-gray-400 dot-3"></div>
+                    <div class="w-3 h-3 rounded-full bg-white opacity-40 border border-gray-400 dot-4"></div>
+                </div>
+            </div>
+
+            <!-- Controls (Filters & Buttons) -->
+            <div class="glass-panel p-4 md:p-6 rounded-xl flex flex-col gap-5">
+                
+                <!-- Filters -->
+                <div>
+                    <h3 class="text-sm font-semibold text-gray-300 mb-3 uppercase tracking-wider">Pilih Filter</h3>
+                    <div class="flex overflow-x-auto gap-3 pb-2 snap-x">
+                        <button class="filter-btn active flex-shrink-0 w-20 h-24 rounded-lg border-2 border-transparent bg-gray-800 flex flex-col items-center justify-center gap-2 transition-all hover:bg-gray-700 snap-center" data-filter="normal">
+                            <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-gray-400 to-gray-200"></div>
+                            <span class="text-xs">Normal</span>
+                        </button>
+                        <button class="filter-btn flex-shrink-0 w-20 h-24 rounded-lg border-2 border-transparent bg-gray-800 flex flex-col items-center justify-center gap-2 transition-all hover:bg-gray-700 snap-center" data-filter="grayscale">
+                            <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-gray-500 to-gray-800 grayscale"></div>
+                            <span class="text-xs">B&W</span>
+                        </button>
+                        <button class="filter-btn flex-shrink-0 w-20 h-24 rounded-lg border-2 border-transparent bg-gray-800 flex flex-col items-center justify-center gap-2 transition-all hover:bg-gray-700 snap-center" data-filter="sepia">
+                            <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-yellow-700 to-orange-200 sepia"></div>
+                            <span class="text-xs">Sepia</span>
+                        </button>
+                        <button class="filter-btn flex-shrink-0 w-20 h-24 rounded-lg border-2 border-transparent bg-gray-800 flex flex-col items-center justify-center gap-2 transition-all hover:bg-gray-700 snap-center" data-filter="vintage">
+                            <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-orange-400 to-pink-300" style="filter: sepia(50%) hue-rotate(-30deg) saturate(140%);"></div>
+                            <span class="text-xs">Vintage</span>
+                        </button>
+                        <button class="filter-btn flex-shrink-0 w-20 h-24 rounded-lg border-2 border-transparent bg-gray-800 flex flex-col items-center justify-center gap-2 transition-all hover:bg-gray-700 snap-center" data-filter="cool">
+                            <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-600 to-cyan-300" style="filter: hue-rotate(180deg) saturate(150%);"></div>
+                            <span class="text-xs">Cool</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex flex-wrap md:flex-nowrap gap-3">
+                    <button id="btn-capture-strip" class="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold py-4 px-6 rounded-xl shadow-lg transform transition active:scale-95 flex items-center justify-center gap-2 text-lg">
+                        <i class="fas fa-camera"></i> Mulai Photobooth
+                    </button>
+                    <button id="btn-switch-cam" class="bg-gray-700 hover:bg-gray-600 text-white py-4 px-6 rounded-xl transition active:scale-95 hidden md:flex items-center justify-center gap-2">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Column: Result / Strip Preview -->
+        <section class="w-full lg:w-1/3 glass-panel rounded-xl p-6 flex flex-col items-center relative min-h-[500px]">
+            <h2 class="text-xl font-bold mb-4 w-full text-center border-b border-gray-700 pb-4">
+                Hasil Foto <i class="fas fa-image ml-2 text-purple-400"></i>
+            </h2>
+            
+            <!-- Empty State -->
+            <div id="empty-state" class="flex-1 flex flex-col items-center justify-center text-gray-500 opacity-70 w-full h-full">
+                <i class="fas fa-ticket-alt text-6xl mb-4 transform -rotate-12"></i>
+                <p class="text-center">Strip foto kamu akan<br>muncul di sini</p>
+            </div>
+
+            <!-- Strip Container -->
+            <div id="strip-result-container" class="hidden flex-col items-center w-full">
+                <div class="overflow-y-auto max-h-[60vh] w-full flex justify-center pb-4 rounded-lg">
+                    <!-- The generated strip image will be placed here -->
+                    <img id="final-strip" src="" alt="Photobooth Strip" class="max-w-[80%] md:max-w-[200px] bg-white p-2 rounded transform transition-transform hover:scale-105">
+                </div>
+                
+                <div class="w-full grid grid-cols-2 gap-3 mt-6">
+                    <button id="btn-retake" class="py-3 px-4 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2">
+                        <i class="fas fa-redo"></i> Ulangi
+                    </button>
+                    <button id="btn-download" class="py-3 px-4 bg-green-600 hover:bg-green-500 text-white rounded-lg font-semibold shadow-lg shadow-green-900/50 transition flex items-center justify-center gap-2">
+                        <i class="fas fa-download"></i> Unduh
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Loading indicator for processing -->
+            <div id="processing-overlay" class="absolute inset-0 bg-gray-900/80 backdrop-blur-sm rounded-xl flex flex-col items-center justify-center hidden z-20">
+                <i class="fas fa-circle-notch fa-spin text-4xl text-blue-500 mb-4"></i>
+                <p class="font-semibold animate-pulse text-blue-100">Memproses Strip Foto...</p>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Hidden Canvas for Processing -->
+    <canvas id="capture-canvas" hidden></canvas>
+    <canvas id="strip-canvas" hidden></canvas>
+
+    <script>
+        // --- State Variables ---
+        let currentStream = null;
+        let facingMode = 'user'; // 'user' (front) or 'environment' (back)
+        let activeFilter = 'normal';
+        const capturedPhotos = [];
+        const TOTAL_PHOTOS = 4;
+        let isCapturing = false;
+
+        // --- DOM Elements ---
+        const video = document.getElementById('camera-feed');
+        const cameraError = document.getElementById('camera-error');
+        const flashOverlay = document.getElementById('flash-overlay');
+        const countdownDisplay = document.getElementById('countdown-display');
+        const progressDots = document.getElementById('progress-dots');
+        
+        const btnCaptureStrip = document.getElementById('btn-capture-strip');
+        const btnSwitchCam = document.getElementById('btn-switch-cam');
+        const filterBtns = document.querySelectorAll('.filter-btn');
+        
+        const emptyState = document.getElementById('empty-state');
+        const stripResultContainer = document.getElementById('strip-result-container');
+        const finalStripImg = document.getElementById('final-strip');
+        const btnRetake = document.getElementById('btn-retake');
+        const btnDownload = document.getElementById('btn-download');
+        const processingOverlay = document.getElementById('processing-overlay');
+
+        // --- Filter Definitions ---
+        const filtersCSS = {
+            normal: 'none',
+            grayscale: 'grayscale(100%)',
+            sepia: 'sepia(100%)',
+            vintage: 'sepia(50%) hue-rotate(-30deg) saturate(140%) contrast(120%)',
+            cool: 'hue-rotate(180deg) saturate(150%) brightness(110%)'
+        };
+
+        // --- Initialize Camera ---
+        async function initCamera() {
+            cameraError.classList.add('hidden');
+            
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { 
+                        facingMode: facingMode,
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
+                    audio: false
+                });
+                
+                currentStream = stream;
+                video.srcObject = stream;
+                
+                // Adjust mirroring based on camera
+                if (facingMode === 'user') {
+                    video.style.transform = 'scaleX(-1)';
+                } else {
+                    video.style.transform = 'scaleX(1)';
+                }
+
+                // Show switch camera button only if mobile/multiple cameras exist
+                navigator.mediaDevices.enumerateDevices().then(devices => {
+                    const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                    if (videoDevices.length > 1) {
+                        btnSwitchCam.classList.remove('hidden');
+                        btnSwitchCam.classList.add('flex');
+                    }
+                });
+
+            } catch (err) {
+                console.error("Error accessing camera: ", err);
+                cameraError.classList.remove('hidden');
+            }
+        }
+
+        // --- Event Listeners ---
+        
+        // Switch Camera
+        btnSwitchCam.addEventListener('click', () => {
+            if (isCapturing) return;
+            facingMode = facingMode === 'user' ? 'environment' : 'user';
+            initCamera();
+        });
+
+        // Filter Selection
+        filterBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (isCapturing) return;
+                
+                // Update UI
+                filterBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                // Apply filter to video feed
+                activeFilter = btn.dataset.filter;
+                video.style.filter = filtersCSS[activeFilter];
+            });
+        });
+
+        // Start Capture Process
+        btnCaptureStrip.addEventListener('click', () => {
+            if (isCapturing) return;
+            startPhotoboothSequence();
+        });
+
+        btnRetake.addEventListener('click', () => {
+            stripResultContainer.classList.add('hidden');
+            emptyState.classList.remove('hidden');
+            capturedPhotos.length = 0; // Clear array
+            
+            // Reset dots
+            for(let i=1; i<=TOTAL_PHOTOS; i++) {
+                document.querySelector(`.dot-${i}`).classList.remove('opacity-100', 'bg-blue-500');
+                document.querySelector(`.dot-${i}`).classList.add('opacity-40', 'bg-white');
+            }
+        });
+
+        btnDownload.addEventListener('click', () => {
+            if (!finalStripImg.src) return;
+            
+            const link = document.createElement('a');
+            link.download = `photobooth-${new Date().getTime()}.png`;
+            link.href = finalStripImg.src;
+            link.click();
+        });
+
+
+        // --- Capture Logic ---
+        
+        async function startPhotoboothSequence() {
+            isCapturing = true;
+            capturedPhotos.length = 0;
+            
+            // UI Updates during capture
+            btnCaptureStrip.disabled = true;
+            btnCaptureStrip.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sedang Foto...';
+            btnCaptureStrip.classList.add('opacity-50', 'cursor-not-allowed');
+            
+            emptyState.classList.remove('hidden');
+            stripResultContainer.classList.add('hidden');
+            progressDots.classList.remove('hidden');
+
+            // Reset dots
+            for(let i=1; i<=TOTAL_PHOTOS; i++) {
+                document.querySelector(`.dot-${i}`).classList.remove('opacity-100', 'bg-blue-500');
+                document.querySelector(`.dot-${i}`).classList.add('opacity-40', 'bg-white');
+            }
+
+            // Take 4 photos with delay
+            for (let i = 0; i < TOTAL_PHOTOS; i++) {
+                await runCountdown(3); // 3 seconds countdown
+                takeSinglePhoto();
+                
+                // Update progress dot
+                const dot = document.querySelector(`.dot-${i+1}`);
+                dot.classList.remove('opacity-40', 'bg-white');
+                dot.classList.add('opacity-100', 'bg-blue-500');
+
+                if (i < TOTAL_PHOTOS - 1) {
+                    await new Promise(r => setTimeout(r, 1000)); // Pause between shots
+                }
+            }
+
+            progressDots.classList.add('hidden');
+            
+            // Generate final strip
+            generatePhotoStrip();
+        }
+
+        function runCountdown(seconds) {
+            return new Promise(resolve => {
+                countdownDisplay.classList.remove('hidden');
+                let count = seconds;
+                
+                countdownDisplay.innerText = count;
+                
+                const interval = setInterval(() => {
+                    count--;
+                    
+                    // Trigger reflow to restart animation
+                    countdownDisplay.classList.remove('countdown-text');
+                    void countdownDisplay.offsetWidth; 
+                    countdownDisplay.classList.add('countdown-text');
+                    
+                    if (count > 0) {
+                        countdownDisplay.innerText = count;
+                    } else if (count === 0) {
+                        countdownDisplay.innerText = "📸";
+                    } else {
+                        clearInterval(interval);
+                        countdownDisplay.classList.add('hidden');
+                        resolve();
+                    }
+                }, 1000);
+            });
+        }
+
+        function takeSinglePhoto() {
+            // Flash Effect
+            flashOverlay.classList.remove('hidden', 'flash-animation');
+            void flashOverlay.offsetWidth; // trigger reflow
+            flashOverlay.classList.add('flash-animation');
+            
+            // Play sound (Optional, using simple audio context beep if no audio file)
+            playShutterSound();
+
+            const canvas = document.getElementById('capture-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Set canvas size to video actual size
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            // Apply current CSS filter to canvas context
+            ctx.filter = filtersCSS[activeFilter];
+
+            // Handle mirroring for front camera
+            if (facingMode === 'user') {
+                ctx.translate(canvas.width, 0);
+                ctx.scale(-1, 1);
+            }
+
+            // Draw video frame
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Save data URL
+            capturedPhotos.push(canvas.toDataURL('image/jpeg', 0.9));
+        }
+
+        function playShutterSound() {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                
+                oscillator.type = 'square';
+                oscillator.frequency.setValueAtTime(150, audioCtx.currentTime); // low click
+                oscillator.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.1);
+                
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + 0.1);
+            } catch(e) {
+                // Ignore if audio context not supported or blocked
+            }
+        }
+
+        // --- Strip Generation ---
+        async function generatePhotoStrip() {
+            processingOverlay.classList.remove('hidden');
+
+            const canvas = document.getElementById('strip-canvas');
+            const ctx = canvas.getContext('2d');
+
+            // Strip Configuration
+            const photoWidth = 600;
+            // standard camera aspect ratio is usually 4:3 or 16:9. We'll crop to 4:3 for the strip
+            const photoHeight = 450; 
+            const padding = 30;
+            const bottomSpace = 120;
+            
+            // Total canvas size
+            canvas.width = photoWidth + (padding * 2);
+            canvas.height = (photoHeight * TOTAL_PHOTOS) + (padding * (TOTAL_PHOTOS + 1)) + bottomSpace;
+
+            // Fill background (White or light gray, classic photobooth)
+            ctx.fillStyle = '#f8fafc'; // light background
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Photos
+            for (let i = 0; i < capturedPhotos.length; i++) {
+                const img = new Image();
+                img.src = capturedPhotos[i];
+                
+                await new Promise(resolve => {
+                    img.onload = () => {
+                        // Calculate position
+                        const x = padding;
+                        const y = padding + (i * (photoHeight + padding));
+                        
+                        // Draw shadow/border for each photo
+                        ctx.shadowColor = 'rgba(0,0,0,0.1)';
+                        ctx.shadowBlur = 10;
+                        ctx.shadowOffsetX = 0;
+                        ctx.shadowOffsetY = 4;
+                        
+                        // Crop logic: Center crop the original image to fit 4:3 (photoWidth x photoHeight)
+                        const scale = Math.max(photoWidth / img.width, photoHeight / img.height);
+                        const drawWidth = img.width * scale;
+                        const drawHeight = img.height * scale;
+                        const sourceX = (img.width - (photoWidth/scale)) / 2;
+                        const sourceY = (img.height - (photoHeight/scale)) / 2;
+                        const sourceWidth = photoWidth / scale;
+                        const sourceHeight = photoHeight / scale;
+
+                        // Save context before clipping
+                        ctx.save();
+                        
+                        // Clip rounded corners for photos
+                        roundRect(ctx, x, y, photoWidth, photoHeight, 8);
+                        ctx.clip();
+                        
+                        // Draw image
+                        ctx.drawImage(img, sourceX, sourceY, sourceWidth, sourceHeight, x, y, photoWidth, photoHeight);
+                        
+                        // Restore context
+                        ctx.restore();
+                        
+                        resolve();
+                    };
+                });
+            }
+
+            // Draw Footer text / Logo
+            ctx.shadowColor = 'transparent';
+            ctx.fillStyle = '#1e293b'; // slate-800
+            ctx.textAlign = 'center';
+            
+            // Using standard font since custom fonts might not load in canvas reliably without proper font-face handling
+            ctx.font = 'bold 36px Arial, sans-serif'; 
+            ctx.fillText('Studio Booth', canvas.width / 2, canvas.height - 70);
+            
+            ctx.font = '24px Arial, sans-serif';
+            ctx.fillStyle = '#64748b';
+            const date = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+            ctx.fillText(date, canvas.width / 2, canvas.height - 35);
+
+            // Update UI
+            finalStripImg.src = canvas.toDataURL('image/jpeg', 0.95);
+            
+            setTimeout(() => {
+                processingOverlay.classList.add('hidden');
+                emptyState.classList.add('hidden');
+                stripResultContainer.classList.remove('hidden');
+                stripResultContainer.classList.add('flex');
+                
+                // Reset capture button
+                btnCaptureStrip.disabled = false;
+                btnCaptureStrip.innerHTML = '<i class="fas fa-camera"></i> Mulai Photobooth';
+                btnCaptureStrip.classList.remove('opacity-50', 'cursor-not-allowed');
+                isCapturing = false;
+            }, 500); // small delay for UX
+        }
+
+        // Helper function for rounded rectangles in canvas
+        function roundRect(ctx, x, y, width, height, radius) {
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + width - radius, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+            ctx.lineTo(x + width, y + height - radius);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+            ctx.lineTo(x + radius, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', initCamera);
+
+    </script>
+</body>
+</html>
