@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kalender 2026 Real-time</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col">
+
+    <!-- Header / Nav -->
+    <header class="sticky top-0 z-50 glass-effect shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="bg-blue-600 text-white p-2 rounded-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>
+                </div>
+                <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
+                    Kalender 2026
+                </h1>
+            </div>
+            
+            <div class="mt-4 md:mt-0 flex flex-col items-center md:items-end">
+                <div id="realtime-clock" class="text-xl font-bold text-slate-700 tracking-wider">
+                    00:00:00
+                </div>
+                <div id="realtime-date" class="text-sm text-slate-500 font-medium">
+                    Memuat tanggal...
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        
+        <div class="text-center mb-10">
+            <h2 class="text-3xl font-bold text-slate-800 mb-2">Tahun 2026</h2>
+            <p class="text-slate-500 max-w-2xl mx-auto">Kalender interaktif dengan penunjuk waktu real-time. Tanggal hari ini akan secara otomatis disorot dengan warna biru.</p>
+        </div>
+
+        <!-- Calendar Grid -->
+        <div id="calendar-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <!-- Bulan akan di-generate oleh JavaScript di sini -->
+        </div>
+
+        <!-- Daftar Hari Libur -->
+        <div class="mt-12 bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8">
+            <h3 class="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-500"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>
+                Daftar Hari Libur Nasional 2026 (Perkiraan)
+            </h3>
+            <ul id="holiday-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-y-3 gap-x-6 text-sm text-slate-600">
+                <!-- Daftar libur akan di-generate oleh JavaScript -->
+            </ul>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 text-center text-sm text-slate-500">
+            &copy; 2026 Kalender Real-time. Dibuat dengan HTML, Tailwind CSS, dan JavaScript.
+        </div>
+    </footer>
+
+    <script>
+        const TARGET_YEAR = 2026;
+        const namaBulan = [
+            'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
+            'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+        ];
+        const namaHari = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+        
+        // Data Perkiraan Libur Nasional 2026 (Format: "Tanggal-BulanIndex")
+        const liburNasional2026 = {
+            "1-0": "Tahun Baru 2026 Masehi",
+            "17-1": "Tahun Baru Imlek 2577 Kongzili",
+            "18-1": "Isra Mikraj Nabi Muhammad SAW",
+            "19-2": "Hari Suci Nyepi Tahun Baru Saka 1948",
+            "20-2": "Hari Raya Idul Fitri 1447 Hijriah",
+            "21-2": "Hari Raya Idul Fitri 1447 Hijriah",
+            "1-4": "Hari Buruh Internasional",
+            "14-4": "Kenaikan Yesus Kristus",
+            "27-4": "Hari Raya Idul Adha 1447 Hijriah",
+            "1-5": "Hari Lahir Pancasila",
+            "16-5": "Tahun Baru Islam 1448 Hijriah",
+            "17-7": "Hari Kemerdekaan RI",
+            "25-7": "Maulid Nabi Muhammad SAW",
+            "25-11": "Hari Raya Natal"
+        };
+
+        let lastRenderedDate = null;
+
+        function renderCalendar() {
+            const container = document.getElementById('calendar-container');
+            container.innerHTML = ''; // Bersihkan container
+
+            const today = new Date();
+            const currentYear = today.getFullYear();
+            const currentMonth = today.getMonth();
+            const currentDate = today.getDate();
+
+            for (let month = 0; month < 12; month++) {
+                // Buat card untuk setiap bulan
+                const monthCard = document.createElement('div');
+                monthCard.className = 'bg-white rounded-2xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition-shadow duration-300';
+
+                // Header Bulan
+                const monthTitle = document.createElement('h3');
+                monthTitle.className = 'text-lg font-bold text-slate-800 mb-4 text-center';
+                monthTitle.textContent = namaBulan[month];
+                monthCard.appendChild(monthTitle);
+
+                // Grid Nama Hari
+                const daysGrid = document.createElement('div');
+                daysGrid.className = 'grid grid-cols-7 gap-1 mb-2';
+                
+                namaHari.forEach((hari, index) => {
+                    const dayLabel = document.createElement('div');
+                    dayLabel.className = `text-xs font-bold text-center py-1 ${index === 0 ? 'text-red-500' : 'text-slate-500'}`;
+                    dayLabel.textContent = hari;
+                    daysGrid.appendChild(dayLabel);
+                });
+                monthCard.appendChild(daysGrid);
+
+                // Grid Tanggal
+                const datesGrid = document.createElement('div');
+                datesGrid.className = 'grid grid-cols-7 gap-1';
+
+                const firstDay = new Date(TARGET_YEAR, month, 1).getDay();
+                const daysInMonth = new Date(TARGET_YEAR, month + 1, 0).getDate();
+
+                // Slot kosong untuk hari sebelum tanggal 1
+                for (let i = 0; i < firstDay; i++) {
+                    const emptySlot = document.createElement('div');
+                    datesGrid.appendChild(emptySlot);
+                }
+
+                // Render angka tanggal
+                for (let date = 1; date <= daysInMonth; date++) {
+                    const dateBtn = document.createElement('div');
+                    dateBtn.className = 'flex items-center justify-center h-8 w-8 mx-auto rounded-full text-sm transition-colors duration-200 cursor-default';
+                    dateBtn.textContent = date;
+
+                    const dayOfWeek = new Date(TARGET_YEAR, month, date).getDay();
+                    const isSunday = dayOfWeek === 0;
+
+                    const holidayKey = `${date}-${month}`;
+                    const holidayName = liburNasional2026[holidayKey];
+                    const isHoliday = !!holidayName;
+
+                    // Cek apakah hari ini
+                    const isToday = (TARGET_YEAR === currentYear && month === currentMonth && date === currentDate);
+
+                    if (isToday) {
+                        dateBtn.classList.add('bg-blue-600', 'text-white', 'font-bold', 'shadow-sm');
+                        dateBtn.title = isHoliday ? `${holidayName} (Hari Ini)` : 'Hari Ini';
+                    } else if (isSunday || isHoliday) {
+                        dateBtn.classList.add('text-red-600', 'font-bold', 'hover:bg-red-50');
+                        if (isHoliday) {
+                            dateBtn.title = holidayName;
+                            // Tambahkan penanda garis bawah tipis untuk membedakan libur nasional yang jatuh di hari biasa (bukan minggu)
+                            if (!isSunday) dateBtn.classList.add('underline', 'decoration-red-300', 'underline-offset-4');
+                        }
+                    } else {
+                        dateBtn.classList.add('text-slate-700', 'hover:bg-slate-100');
+                    }
+
+                    datesGrid.appendChild(dateBtn);
+                }
+
+                monthCard.appendChild(datesGrid);
+                monthCard.appendChild(datesGrid);
+                container.appendChild(monthCard);
+            }
+            
+            lastRenderedDate = currentDate;
+            renderHolidayList();
+        }
+
+        function renderHolidayList() {
+            const listContainer = document.getElementById('holiday-list');
+            listContainer.innerHTML = '';
+            
+            // Konversi object ke array dan urutkan
+            const holidays = [];
+            for (const key in liburNasional2026) {
+                const [date, month] = key.split('-').map(Number);
+                holidays.push({
+                    date: date,
+                    month: month,
+                    name: liburNasional2026[key],
+                    timestamp: new Date(TARGET_YEAR, month, date).getTime()
+                });
+            }
+            
+            holidays.sort((a, b) => a.timestamp - b.timestamp);
+
+            holidays.forEach(holiday => {
+                const li = document.createElement('li');
+                li.className = 'flex items-start gap-2';
+                li.innerHTML = `
+                    <span class="text-red-500 font-bold min-w-[55px]">${holiday.date} ${namaBulan[holiday.month].substring(0, 3)}</span>
+                    <span>${holiday.name}</span>
+                `;
+                listContainer.appendChild(li);
+            });
+        }
+
+        function updateClock() {
+            const now = new Date();
+            
+            // Format Waktu (Jam:Menit:Detik)
+            const timeString = now.toLocaleTimeString('id-ID', { 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit',
+                hour12: false
+            });
+            
+            // Format Tanggal Lengkap (Hari, Tanggal Bulan Tahun)
+            const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            const dateString = now.toLocaleDateString('id-ID', dateOptions);
+
+            document.getElementById('realtime-clock').textContent = timeString + ' WIB';
+            document.getElementById('realtime-date').textContent = dateString;
+
+            // Jika berganti hari (melewati tengah malam), render ulang kalender agar highlight "hari ini" berpindah
+            if (lastRenderedDate !== null && now.getDate() !== lastRenderedDate) {
+                renderCalendar();
+            }
+        }
+
+        // Inisialisasi
+        renderCalendar();
+        updateClock();
+        
+        // Update jam setiap 1 detik
+        setInterval(updateClock, 1000);
+
+    </script>
+</body>
+</html>
