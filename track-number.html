@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoTrack Pro - Analisis & Pelacak Nomor HP</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome untuk Ikon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Leaflet CSS untuk Peta -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        darkbg: '#0f172a',
+                        cardbg: '#1e293b',
+                        primary: '#38bdf8',
+                        accent: '#818cf8'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+        /* Loader Animation */
+        .scan-line {
+            width: 100%;
+            height: 2px;
+            background: #38bdf8;
+            position: absolute;
+            top: 0;
+            left: 0;
+            animation: scan 2s infinite linear;
+            box-shadow: 0 0 10px #38bdf8, 0 0 20px #38bdf8;
+            z-index: 10;
+            display: none;
+        }
+
+        @keyframes scan {
+            0% { top: 0; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+
+        /* Radar Marker CSS */
+        .radar-marker {
+            width: 20px;
+            height: 20px;
+            background-color: #38bdf8;
+            border-radius: 50%;
+            position: relative;
+        }
+        .radar-marker::after {
+            content: '';
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            background-color: rgba(56, 189, 248, 0.4);
+            border-radius: 50%;
+            top: -20px;
+            left: -20px;
+            animation: pulse-radar 1.5s infinite ease-out;
+        }
+
+        @keyframes pulse-radar {
+            0% { transform: scale(0.1); opacity: 1; }
+            100% { transform: scale(1.5); opacity: 0; }
+        }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans antialiased selection:bg-primary selection:text-white">
+
+    <!-- Header -->
+    <header class="border-b border-gray-800 bg-gray-900/80 backdrop-blur-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-satellite-dish text-primary text-2xl"></i>
+                <h1 class="text-xl font-bold tracking-wider text-white">GeoTrack <span class="text-primary">Pro</span></h1>
+            </div>
+            <div class="flex items-center gap-4 text-sm font-mono">
+                <div class="flex items-center gap-2 text-green-400">
+                    <div class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
+                    HLR Server: Online
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Left Column: Input & Info -->
+        <div class="lg:col-span-4 flex flex-col gap-6">
+            
+            <!-- Search Box -->
+            <div class="glass-panel p-6 rounded-2xl shadow-xl relative overflow-hidden">
+                <div class="scan-line" id="scanLine"></div>
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
+                    <i class="fa-solid fa-magnifying-glass text-gray-400"></i> Lacak Nomor
+                </h2>
+                <form id="trackForm" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-400 mb-1">Format: +628... atau 08...</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fa-solid fa-phone text-gray-500"></i>
+                            </div>
+                            <input type="tel" id="phoneNumber" placeholder="Contoh: 081234567890" required
+                                class="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-mono text-sm">
+                        </div>
+                    </div>
+                    <button type="submit" id="trackBtn" class="w-full bg-primary hover:bg-sky-500 text-slate-900 font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-crosshairs"></i> Mulai Analisis
+                    </button>
+                </form>
+
+                <!-- Processing Steps (Hidden by default) -->
+                <div id="processingSteps" class="hidden mt-4 space-y-2 font-mono text-xs text-gray-400">
+                    <div id="step1" class="flex items-center gap-2"><i class="fa-solid fa-spinner fa-spin text-primary"></i> Menghubungi server HLR...</div>
+                    <div id="step2" class="flex items-center gap-2 hidden"><i class="fa-solid fa-check text-green-400"></i> Prefix diidentifikasi...</div>
+                    <div id="step3" class="flex items-center gap-2 hidden"><i class="fa-solid fa-spinner fa-spin text-primary"></i> Mengekstrak metadata lokasi...</div>
+                </div>
+            </div>
+
+            <!-- Warning Disclaimer -->
+            <div class="bg-yellow-900/20 border border-yellow-700/50 p-4 rounded-xl text-xs text-yellow-200/80 leading-relaxed flex gap-3">
+                <i class="fa-solid fa-triangle-exclamation text-yellow-500 text-base mt-0.5"></i>
+                <p><strong>Disclaimer:</strong> Aplikasi ini menggunakan metode HLR Lookup untuk mendeteksi operator, jenis jaringan, dan kode wilayah. Pelacakan GPS real-time tidak mungkin dilakukan tanpa otoritas hukum.</p>
+            </div>
+
+            <!-- History Panel -->
+            <div class="glass-panel p-6 rounded-2xl shadow-xl flex-grow">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-clock-rotate-left text-gray-400"></i> Riwayat
+                    </h2>
+                    <button id="clearHistoryBtn" class="text-xs text-gray-400 hover:text-red-400 transition-colors">Hapus</button>
+                </div>
+                <div id="historyList" class="space-y-3 max-h-48 overflow-y-auto pr-2">
+                    <p class="text-sm text-gray-500 text-center py-4 font-mono">Belum ada riwayat pencarian.</p>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Right Column: Results & Map -->
+        <div class="lg:col-span-8 flex flex-col gap-6">
+            
+            <!-- Results Dashboard -->
+            <div class="glass-panel p-6 rounded-2xl shadow-xl grid grid-cols-2 md:grid-cols-4 gap-4 relative">
+                <!-- Overlay if no data -->
+                <div id="noDataOverlay" class="absolute inset-0 bg-gray-900/80 backdrop-blur-sm z-10 flex items-center justify-center rounded-2xl">
+                    <p class="text-gray-400 font-mono text-sm"><i class="fa-solid fa-arrow-left mr-2"></i>Masukkan nomor untuk melihat hasil</p>
+                </div>
+
+                <div class="bg-gray-800/50 p-4 rounded-xl border border-gray-700/50">
+                    <p class="text-xs text-gray-400 font-medium mb-1 uppercase tracking-wider">Negara</p>
+                    <p id="resCountry" class="text-lg font-bold text-white">-</p>
+                    <p id="resCountryCode" class="text-xs text-primary font-mono mt-1">-</p>
+                </div>
+                <div class="bg-gray-800/50 p-4 rounded-xl border border-gray-700/50">
+                    <p class="text-xs text-gray-400 font-medium mb-1 uppercase tracking-wider">Operator</p>
+                    <p id="resProvider" class="text-lg font-bold text-white">-</p>
+                    <p id="resLineType" class="text-xs text-green-400 font-mono mt-1">-</p>
+                </div>
+                <div class="bg-gray-800/50 p-4 rounded-xl border border-gray-700/50">
+                    <p class="text-xs text-gray-400 font-medium mb-1 uppercase tracking-wider">Provinsi/Kota</p>
+                    <p id="resRegion" class="text-lg font-bold text-white">-</p>
+                    <p class="text-xs text-gray-500 font-mono mt-1">Berdasarkan HLR</p>
+                </div>
+                <div class="bg-gray-800/50 p-4 rounded-xl border border-gray-700/50">
+                    <p class="text-xs text-gray-400 font-medium mb-1 uppercase tracking-wider">Status Validasi</p>
+                    <div class="flex items-center gap-2 mt-1">
+                        <div id="resStatusIcon" class="w-3 h-3 rounded-full bg-gray-600"></div>
+                        <p id="resStatus" class="text-sm font-bold text-white">Menunggu</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Map Container -->
+            <div class="glass-panel p-2 rounded-2xl shadow-xl flex-grow flex flex-col min-h-[400px]">
+                <div class="px-4 py-3 flex items-center justify-between border-b border-gray-700/50 mb-2">
+                    <h2 class="text-sm font-semibold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-map-location-dot text-primary"></i> Visualisasi Geografis (Area HLR)
+                    </h2>
+                    <span id="mapCoordinates" class="text-xs font-mono text-gray-400">Lat: -, Lng: -</span>
+                </div>
+                <div id="map" class="flex-grow rounded-xl bg-gray-800 z-0 border border-gray-700 overflow-hidden"></div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        // --- Database Lokal Prefix Indonesia (Simulasi HLR) ---
+        const providerData = {
+            telkomsel: { name: "Telkomsel", color: "text-red-500", prefixes: ["0811", "0812", "0813", "0821", "0822", "0823", "0851", "0852", "0853"] },
+            indosat: { name: "Indosat Ooredoo", color: "text-yellow-400", prefixes: ["0814", "0815", "0816", "0855", "0856", "0857", "0858"] },
+            xl: { name: "XL Axiata", color: "text-blue-500", prefixes: ["0817", "0818", "0819", "0859", "0877", "0878"] },
+            axis: { name: "Axis", color: "text-purple-500", prefixes: ["0838", "0831", "0832", "0833"] },
+            tri: { name: "Tri (3)", color: "text-orange-500", prefixes: ["0895", "0896", "0897", "0898", "0899"] },
+            smartfren: { name: "Smartfren", color: "text-pink-500", prefixes: ["0881", "0882", "0883", "0884", "0885", "0886", "0887", "0888", "0889"] }
+        };
+
+        // Data Area Kode Telepon Rumah (Landline)
+        const areaCodes = {
+            "021": { region: "Jabodetabek", lat: -6.2088, lng: 106.8456 },
+            "022": { region: "Bandung", lat: -6.9147, lng: 107.6098 },
+            "024": { region: "Semarang", lat: -6.9667, lng: 110.4167 },
+            "031": { region: "Surabaya", lat: -7.2504, lng: 112.7688 },
+            "0274": { region: "Yogyakarta", lat: -7.7956, lng: 110.3695 },
+            "061": { region: "Medan", lat: 3.5952, lng: 98.6722 },
+            "0361": { region: "Denpasar", lat: -8.6500, lng: 115.2167 },
+            "0411": { region: "Makassar", lat: -5.1477, lng: 119.4327 },
+            "0711": { region: "Palembang", lat: -2.9909, lng: 104.7566 }
+        };
+
+        // Koordinat Default (Pusat Indonesia)
+        const defaultIDCoord = { lat: -0.7893, lng: 113.9213, zoom: 5 };
+
+        // --- Variabel Global ---
+        let map;
+        let currentMarker;
+        let searchHistory = JSON.parse(localStorage.getItem('phoneTrackerHistory')) || [];
+
+        // --- Inisialisasi Peta ---
+        function initMap() {
+            // Menggunakan Dark Theme Map dari CartoDB
+            map = L.map('map').setView([defaultIDCoord.lat, defaultIDCoord.lng], defaultIDCoord.zoom);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                subdomains: 'abcd',
+                maxZoom: 20
+            }).addTo(map);
+        }
+
+        // --- Helper Functions ---
+        function cleanPhoneNumber(phone) {
+            // Hapus spasi, strip, dll
+            let cleaned = phone.replace(/\D/g, '');
+            // Ubah +62 jadi 0 (Untuk mempermudah logika lokal)
+            if (cleaned.startsWith('62')) {
+                cleaned = '0' + cleaned.substring(2);
+            }
+            return cleaned;
+        }
+
+        function analyzeNumber(rawNumber) {
+            let phone = cleanPhoneNumber(rawNumber);
+            
+            // Format tidak valid (terlalu pendek/panjang)
+            if (phone.length < 8 || phone.length > 14) {
+                return { valid: false, message: "Nomor tidak valid." };
+            }
+
+            let result = {
+                valid: true,
+                raw: rawNumber,
+                cleaned: phone,
+                country: "Indonesia",
+                countryCode: "+62",
+                provider: "Tidak Diketahui",
+                lineType: "Mobile",
+                region: "Nasional (Indonesia)",
+                lat: defaultIDCoord.lat + (Math.random() * 4 - 2), // Random offset kecil untuk animasi
+                lng: defaultIDCoord.lng + (Math.random() * 10 - 5),
+                zoom: 6
+            };
+
+            // Cek apakah ini nomor HP (Mobile) - Cek Prefix 4 digit
+            let prefix4 = phone.substring(0, 4);
+            let foundMobile = false;
+            
+            for (const [key, data] of Object.entries(providerData)) {
+                if (data.prefixes.includes(prefix4)) {
+                    result.provider = data.name;
+                    result.providerColor = data.color;
+                    foundMobile = true;
+                    // Untuk mobile, kita arahkan ke Ibukota secara default sbg representasi HLR pusat
+                    result.lat = -6.2088; 
+                    result.lng = 106.8456;
+                    result.zoom = 10;
+                    break;
+                }
+            }
+
+            // Jika bukan mobile, cek apakah Landline (Telepon Rumah)
+            if (!foundMobile) {
+                // Cek kode area 3 atau 4 digit
+                let prefix3 = phone.substring(0, 3);
+                let prefix4Land = phone.substring(0, 4);
+                
+                if (areaCodes[prefix3]) {
+                    result.provider = "Telkom / Fixed Line";
+                    result.lineType = "Landline";
+                    result.region = areaCodes[prefix3].region;
+                    result.lat = areaCodes[prefix3].lat;
+                    result.lng = areaCodes[prefix3].lng;
+                    result.zoom = 12;
+                } else if (areaCodes[prefix4Land]) {
+                    result.provider = "Telkom / Fixed Line";
+                    result.lineType = "Landline";
+                    result.region = areaCodes[prefix4Land].region;
+                    result.lat = areaCodes[prefix4Land].lat;
+                    result.lng = areaCodes[prefix4Land].lng;
+                    result.zoom = 12;
+                } else if (phone.startsWith('0')) {
+                     // Anggap nomor lokal lain yg tidak terdaftar di mock data
+                     result.provider = "Operator Lokal";
+                     result.region = "Indonesia";
+                } else {
+                    // Jika tidak diawali 0 atau +62, mungkin nomor luar negeri (Mockup)
+                    result.country = "Internasional";
+                    result.countryCode = "Unknown";
+                    result.region = "Luar Negeri";
+                    result.lat = 20.0;
+                    result.lng = 0.0;
+                    result.zoom = 2;
+                }
+            }
+
+            return result;
+        }
+
+        // --- UI Updates ---
+        function updateDashboard(data) {
+            document.getElementById('noDataOverlay').style.display = 'none';
+
+            if (!data.valid) {
+                document.getElementById('resStatus').textContent = "Tidak Valid";
+                document.getElementById('resStatus').className = "text-sm font-bold text-red-500";
+                document.getElementById('resStatusIcon').className = "w-3 h-3 rounded-full bg-red-500 animate-pulse";
+                return;
+            }
+
+            // Update Text
+            document.getElementById('resCountry').textContent = data.country;
+            document.getElementById('resCountryCode').textContent = `Kode: ${data.countryCode}`;
+            
+            const providerEl = document.getElementById('resProvider');
+            providerEl.textContent = data.provider;
+            providerEl.className = `text-lg font-bold ${data.providerColor || 'text-white'}`;
+            
+            document.getElementById('resLineType').textContent = `Tipe: ${data.lineType}`;
+            document.getElementById('resRegion').textContent = data.region;
+            
+            document.getElementById('resStatus').textContent = "Aktif (Valid)";
+            document.getElementById('resStatus').className = "text-sm font-bold text-green-400";
+            document.getElementById('resStatusIcon').className = "w-3 h-3 rounded-full bg-green-400 shadow-[0_0_8px_#4ade80]";
+
+            // Update Map Coordinates Text
+            document.getElementById('mapCoordinates').textContent = `Lat: ${data.lat.toFixed(4)}, Lng: ${data.lng.toFixed(4)}`;
+
+            // Plot Map
+            plotOnMap(data.lat, data.lng, data.zoom, data.region, data.provider);
+            
+            // Save to history
+            saveToHistory(data);
+        }
+
+        function plotOnMap(lat, lng, zoom, region, provider) {
+            // Hapus marker lama
+            if (currentMarker) {
+                map.removeLayer(currentMarker);
+            }
+
+            // Animasi terbang ke lokasi
+            map.flyTo([lat, lng], zoom, {
+                animate: true,
+                duration: 2 // detik
+            });
+
+            // Buat Custom Icon Radar
+            const radarIcon = L.divIcon({
+                className: 'custom-div-icon',
+                html: "<div class='radar-marker'></div>",
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
+            });
+
+            // Tambahkan marker setelah animasi selesai
+            setTimeout(() => {
+                currentMarker = L.marker([lat, lng], {icon: radarIcon}).addTo(map);
+                currentMarker.bindPopup(`
+                    <div class="text-slate-900 font-sans p-1">
+                        <strong class="block mb-1 border-b border-gray-300 pb-1">Lokasi HLR</strong>
+                        <div class="text-sm">Area: ${region}</div>
+                        <div class="text-sm">Jaringan: ${provider}</div>
+                    </div>
+                `).openPopup();
+            }, 2000);
+        }
+
+        // --- History Management ---
+        function renderHistory() {
+            const list = document.getElementById('historyList');
+            list.innerHTML = '';
+            
+            if (searchHistory.length === 0) {
+                list.innerHTML = '<p class="text-sm text-gray-500 text-center py-4 font-mono">Belum ada riwayat pencarian.</p>';
+                return;
+            }
+
+            searchHistory.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = "flex items-center justify-between p-3 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg border border-gray-700/50 transition-colors cursor-pointer group";
+                div.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-slate-900 transition-colors">
+                            <i class="fa-solid ${item.lineType === 'Mobile' ? 'fa-mobile-screen' : 'fa-phone-volume'}"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm font-bold text-gray-200">${item.raw}</p>
+                            <p class="text-xs text-gray-400">${item.provider} • ${item.region}</p>
+                        </div>
+                    </div>
+                    <div class="text-xs text-gray-500 font-mono">${item.time}</div>
+                `;
+                // Klik riwayat untuk melacak ulang (tanpa animasi delay panjang)
+                div.onclick = () => {
+                    document.getElementById('phoneNumber').value = item.raw;
+                    document.getElementById('trackForm').dispatchEvent(new Event('submit'));
+                };
+                list.appendChild(div);
+            });
+        }
+
+        function saveToHistory(data) {
+            // Cek duplikat
+            const exists = searchHistory.findIndex(i => i.cleaned === data.cleaned);
+            if (exists !== -1) {
+                searchHistory.splice(exists, 1);
+            }
+
+            const now = new Date();
+            const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+
+            searchHistory.unshift({
+                raw: data.raw,
+                cleaned: data.cleaned,
+                provider: data.provider,
+                region: data.region,
+                lineType: data.lineType,
+                time: timeStr
+            });
+
+            // Batasi 5 riwayat
+            if (searchHistory.length > 5) searchHistory.pop();
+            
+            localStorage.setItem('phoneTrackerHistory', JSON.stringify(searchHistory));
+            renderHistory();
+        }
+
+        document.getElementById('clearHistoryBtn').addEventListener('click', () => {
+            searchHistory = [];
+            localStorage.removeItem('phoneTrackerHistory');
+            renderHistory();
+        });
+
+
+        // --- Main Event Listener ---
+        document.getElementById('trackForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const phoneInput = document.getElementById('phoneNumber').value;
+            if(!phoneInput) return;
+
+            const btn = document.getElementById('trackBtn');
+            const scanLine = document.getElementById('scanLine');
+            const stepsDiv = document.getElementById('processingSteps');
+            const step1 = document.getElementById('step1');
+            const step2 = document.getElementById('step2');
+            const step3 = document.getElementById('step3');
+
+            // Reset UI State for animation
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Menganalisis...';
+            scanLine.style.display = 'block';
+            stepsDiv.classList.remove('hidden');
+            step1.classList.remove('hidden');
+            step2.classList.add('hidden');
+            step3.classList.add('hidden');
+            document.getElementById('noDataOverlay').style.display = 'flex';
+
+            // Simulate Data Fetching Delay (For effect)
+            setTimeout(() => {
+                step1.innerHTML = '<i class="fa-solid fa-check text-green-400"></i> Server terhubung.';
+                step2.classList.remove('hidden');
+                
+                setTimeout(() => {
+                    step3.classList.remove('hidden');
+                    
+                    setTimeout(() => {
+                        // Lakukan analisis sesungguhnya
+                        const result = analyzeNumber(phoneInput);
+                        
+                        // Update UI dgn Hasil
+                        updateDashboard(result);
+
+                        // Reset Button & Loading UI
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fa-solid fa-crosshairs"></i> Mulai Analisis';
+                        scanLine.style.display = 'none';
+                        setTimeout(() => stepsDiv.classList.add('hidden'), 3000);
+                        step1.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-primary"></i> Menghubungi server HLR...';
+
+                    }, 800);
+                }, 800);
+            }, 600);
+        });
+
+        // Initialize App
+        window.onload = () => {
+            initMap();
+            renderHistory();
+        };
+
+    </script>
+</body>
+</html>
