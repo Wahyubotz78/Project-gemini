@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pendeteksi Cuaca & Hujan Realtime</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background 0.8s ease, color 0.8s ease;
+        }
+
+        /* Tema Cuaca */
+        .theme-cerah {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+        .theme-berawan {
+            background: linear-gradient(135deg, #8e9eab 0%, #eef2f3 100%);
+            color: #333;
+        }
+        .theme-hujan {
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            color: white;
+        }
+        .theme-badai {
+            background: linear-gradient(135deg, #141e30 0%, #243b55 100%);
+            color: white;
+        }
+
+        /* Animasi Hujan (Sederhana) */
+        .rain-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+            display: none;
+        }
+        .raining .rain-container {
+            display: block;
+        }
+        .drop {
+            position: absolute;
+            bottom: 100%;
+            width: 2px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.5);
+            animation: fall linear infinite;
+        }
+        @keyframes fall {
+            to {
+                transform: translateY(100vh);
+            }
+        }
+
+        /* Glassmorphism Card */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+        }
+        
+        .theme-berawan .glass-card {
+            background: rgba(255, 255, 255, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
+        }
+
+        .loader {
+            border: 4px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top: 4px solid #fff;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+        .theme-berawan .loader {
+            border: 4px solid rgba(0,0,0,0.1);
+            border-top: 4px solid #333;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 theme-cerah relative">
+    
+    <!-- Efek Hujan -->
+    <div class="rain-container" id="rainEffect"></div>
+
+    <div class="max-w-md w-full glass-card rounded-3xl p-6 relative z-10 transition-all duration-500">
+        
+        <!-- Header & Search -->
+        <div class="flex flex-col gap-4 mb-8">
+            <h1 class="text-2xl font-bold text-center flex items-center justify-center gap-2">
+                <i data-lucide="cloud-rain" class="w-7 h-7"></i> Info Cuaca
+            </h1>
+            
+            <div class="flex gap-2">
+                <div class="relative flex-1">
+                    <input type="text" id="cityInput" placeholder="Cari kota..." class="w-full bg-white/20 border border-white/30 rounded-xl py-2 px-4 placeholder-current focus:outline-none focus:ring-2 focus:ring-white/50 transition-all text-inherit backdrop-blur-sm">
+                </div>
+                <button onclick="searchWeather()" class="bg-white/20 hover:bg-white/30 p-2.5 rounded-xl border border-white/30 transition-all backdrop-blur-sm" title="Cari">
+                    <i data-lucide="search" class="w-5 h-5"></i>
+                </button>
+                <button onclick="getDeviceLocation()" class="bg-white/20 hover:bg-white/30 p-2.5 rounded-xl border border-white/30 transition-all backdrop-blur-sm" title="Gunakan Lokasi Saya">
+                    <i data-lucide="map-pin" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading" class="hidden flex-col items-center justify-center py-10">
+            <div class="loader mb-4"></div>
+            <p class="font-medium animate-pulse">Mengambil data cuaca...</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="errorMsg" class="hidden text-center py-6 bg-red-500/20 border border-red-500/50 rounded-xl text-red-100">
+            <p id="errorText">Gagal mengambil data.</p>
+        </div>
+
+        <!-- Main Weather Display -->
+        <div id="weatherContent" class="hidden opacity-0 transition-opacity duration-500">
+            
+            <!-- Alert Hujan -->
+            <div id="rainAlert" class="hidden mb-6 bg-blue-500/30 border-l-4 border-blue-200 p-4 rounded-r-xl">
+                <div class="flex items-start gap-3">
+                    <i data-lucide="cloud-drizzle" class="w-6 h-6 flex-shrink-0 animate-bounce"></i>
+                    <div>
+                        <h3 class="font-bold text-lg">Hujan Terdeteksi!</h3>
+                        <p class="text-sm opacity-90">Sedia payung atau jas hujan sebelum beraktivitas di luar.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-center mb-8">
+                <h2 id="locationName" class="text-3xl font-bold tracking-tight mb-1">Jakarta</h2>
+                <p id="dateText" class="text-sm opacity-80 mb-4">Senin, 1 Januari 2024</p>
+                
+                <div class="flex items-center justify-center gap-4">
+                    <div id="weatherIconContainer" class="p-4 bg-white/10 rounded-full shadow-inner border border-white/10">
+                        <i id="weatherIcon" data-lucide="sun" class="w-20 h-20 drop-shadow-lg"></i>
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <span id="temperature" class="text-7xl font-bold tracking-tighter drop-shadow-md">28°</span>
+                </div>
+                <p id="weatherDesc" class="text-2xl font-medium mt-2 capitalize drop-shadow">Cerah</p>
+            </div>
+
+            <!-- Weather Details Grid -->
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-white/10 p-4 rounded-2xl flex items-center gap-3 border border-white/10">
+                    <i data-lucide="droplets" class="w-6 h-6 opacity-70"></i>
+                    <div>
+                        <p class="text-xs opacity-70">Kelembapan</p>
+                        <p id="humidity" class="text-lg font-semibold">80%</p>
+                    </div>
+                </div>
+                <div class="bg-white/10 p-4 rounded-2xl flex items-center gap-3 border border-white/10">
+                    <i data-lucide="wind" class="w-6 h-6 opacity-70"></i>
+                    <div>
+                        <p class="text-xs opacity-70">Kecepatan Angin</p>
+                        <p id="windSpeed" class="text-lg font-semibold">12 km/h</p>
+                    </div>
+                </div>
+                <div class="bg-white/10 p-4 rounded-2xl flex items-center gap-3 border border-white/10">
+                    <i data-lucide="cloud-rain" class="w-6 h-6 opacity-70"></i>
+                    <div>
+                        <p class="text-xs opacity-70">Curah Hujan</p>
+                        <p id="precipitation" class="text-lg font-semibold">0 mm</p>
+                    </div>
+                </div>
+                <div class="bg-white/10 p-4 rounded-2xl flex items-center gap-3 border border-white/10">
+                    <i data-lucide="thermometer" class="w-6 h-6 opacity-70"></i>
+                    <div>
+                        <p class="text-xs opacity-70">Terasa Seperti</p>
+                        <p id="feelsLike" class="text-lg font-semibold">30°</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Inisialisasi Lucide Icons
+        lucide.createIcons();
+
+        // Elemen DOM
+        const cityInput = document.getElementById('cityInput');
+        const loading = document.getElementById('loading');
+        const errorMsg = document.getElementById('errorMsg');
+        const errorText = document.getElementById('errorText');
+        const weatherContent = document.getElementById('weatherContent');
+        const rainAlert = document.getElementById('rainAlert');
+        
+        // Buat efek hujan statis di container
+        const createRain = () => {
+            const container = document.getElementById('rainEffect');
+            container.innerHTML = ''; // Bersihkan hujan sebelumnya
+            for(let i=0; i<50; i++) {
+                const drop = document.createElement('div');
+                drop.classList.add('drop');
+                drop.style.left = `${Math.random() * 100}%`;
+                drop.style.animationDuration = `${Math.random() * 0.5 + 0.5}s`;
+                drop.style.animationDelay = `${Math.random() * 2}s`;
+                container.appendChild(drop);
+            }
+        };
+        createRain();
+
+        // Jalankan saat pertama kali dibuka
+        window.onload = () => {
+            // Default load (Jakarta atau deteksi lokasi)
+            getDeviceLocation();
+        };
+
+        // Event listener untuk Enter di input pencarian
+        cityInput.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                searchWeather();
+            }
+        });
+
+        // WMO Weather interpretation codes (https://open-meteo.com/en/docs)
+        function getWeatherDetails(code) {
+            const weatherCodes = {
+                0: { desc: 'Cerah', icon: 'sun', theme: 'theme-cerah', isRain: false },
+                1: { desc: 'Sebagian Cerah', icon: 'sun-dim', theme: 'theme-cerah', isRain: false },
+                2: { desc: 'Berawan Sebagian', icon: 'cloud-sun', theme: 'theme-berawan', isRain: false },
+                3: { desc: 'Mendung', icon: 'cloud', theme: 'theme-berawan', isRain: false },
+                45: { desc: 'Berkabut', icon: 'cloud-fog', theme: 'theme-berawan', isRain: false },
+                48: { desc: 'Kabut Tebal', icon: 'cloud-fog', theme: 'theme-berawan', isRain: false },
+                51: { desc: 'Gerimis Ringan', icon: 'cloud-drizzle', theme: 'theme-hujan', isRain: true },
+                53: { desc: 'Gerimis Sedang', icon: 'cloud-drizzle', theme: 'theme-hujan', isRain: true },
+                55: { desc: 'Gerimis Lebat', icon: 'cloud-drizzle', theme: 'theme-hujan', isRain: true },
+                56: { desc: 'Gerimis Membeku', icon: 'cloud-snow', theme: 'theme-hujan', isRain: true },
+                57: { desc: 'Gerimis Membeku Lebat', icon: 'cloud-snow', theme: 'theme-hujan', isRain: true },
+                61: { desc: 'Hujan Ringan', icon: 'cloud-rain', theme: 'theme-hujan', isRain: true },
+                63: { desc: 'Hujan Sedang', icon: 'cloud-rain', theme: 'theme-hujan', isRain: true },
+                65: { desc: 'Hujan Lebat', icon: 'cloud-rain', theme: 'theme-hujan', isRain: true },
+                66: { desc: 'Hujan Es Ringan', icon: 'cloud-snow', theme: 'theme-hujan', isRain: true },
+                67: { desc: 'Hujan Es Lebat', icon: 'cloud-snow', theme: 'theme-hujan', isRain: true },
+                71: { desc: 'Salju Ringan', icon: 'snowflake', theme: 'theme-berawan', isRain: false },
+                73: { desc: 'Salju Sedang', icon: 'snowflake', theme: 'theme-berawan', isRain: false },
+                75: { desc: 'Salju Lebat', icon: 'snowflake', theme: 'theme-berawan', isRain: false },
+                77: { desc: 'Butiran Salju', icon: 'snowflake', theme: 'theme-berawan', isRain: false },
+                80: { desc: 'Hujan Badai Ringan', icon: 'cloud-lightning', theme: 'theme-badai', isRain: true },
+                81: { desc: 'Hujan Badai Sedang', icon: 'cloud-lightning', theme: 'theme-badai', isRain: true },
+                82: { desc: 'Hujan Badai Lebat', icon: 'cloud-lightning', theme: 'theme-badai', isRain: true },
+                85: { desc: 'Badai Salju Ringan', icon: 'cloud-snow', theme: 'theme-badai', isRain: false },
+                86: { desc: 'Badai Salju Lebat', icon: 'cloud-snow', theme: 'theme-badai', isRain: false },
+                95: { desc: 'Badai Petir', icon: 'cloud-lightning', theme: 'theme-badai', isRain: true },
+                96: { desc: 'Badai Petir & Hujan Es', icon: 'cloud-lightning', theme: 'theme-badai', isRain: true },
+                99: { desc: 'Badai Petir Ekstrem', icon: 'cloud-lightning', theme: 'theme-badai', isRain: true },
+            };
+            return weatherCodes[code] || { desc: 'Tidak Diketahui', icon: 'cloud-help', theme: 'theme-berawan', isRain: false };
+        }
+
+        function showLoading() {
+            weatherContent.classList.add('hidden');
+            weatherContent.classList.remove('opacity-100');
+            errorMsg.classList.add('hidden');
+            loading.classList.remove('hidden');
+            loading.classList.add('flex');
+        }
+
+        function showError(message) {
+            loading.classList.add('hidden');
+            loading.classList.remove('flex');
+            weatherContent.classList.add('hidden');
+            errorText.textContent = message;
+            errorMsg.classList.remove('hidden');
+        }
+
+        function formatTanggal() {
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            return new Date().toLocaleDateString('id-ID', options);
+        }
+
+        // 1. Dapatkan lokasi pengguna melalui GPS
+        function getDeviceLocation() {
+            showLoading();
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    async (position) => {
+                        const lat = position.coords.latitude;
+                        const lon = position.coords.longitude;
+                        await fetchLocationNameAndWeather(lat, lon);
+                    },
+                    (error) => {
+                        console.warn("Geolocation ditolak atau gagal:", error);
+                        // Fallback ke Jakarta jika lokasi tidak diizinkan
+                        fetchWeatherByCoords(-6.2088, 106.8456, "Jakarta Pusat");
+                    }
+                );
+            } else {
+                showError("Browser Anda tidak mendukung deteksi lokasi.");
+            }
+        }
+
+        // 2. Cari berdasarkan nama kota
+        async function searchWeather() {
+            const city = cityInput.value.trim();
+            if (!city) return;
+            
+            showLoading();
+            try {
+                // Gunakan API geocoding Open-Meteo untuk mencari koordinat kota
+                const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=id&format=json`);
+                const geoData = await geoRes.json();
+
+                if (!geoData.results || geoData.results.length === 0) {
+                    showError("Kota tidak ditemukan. Coba kata kunci lain.");
+                    return;
+                }
+
+                const { latitude, longitude, name, admin1, country } = geoData.results[0];
+                const locationLabel = admin1 ? `${name}, ${admin1}` : `${name}, ${country}`;
+                
+                await fetchWeatherByCoords(latitude, longitude, locationLabel);
+                
+            } catch (err) {
+                showError("Gagal terhubung ke server pencarian lokasi.");
+            }
+        }
+
+        // 3. Ambil nama lokasi dari koordinat (Reverse Geocoding)
+        async function fetchLocationNameAndWeather(lat, lon) {
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10&accept-language=id`);
+                const data = await res.json();
+                
+                let cityName = "Lokasi Saat Ini";
+                if (data && data.address) {
+                    cityName = data.address.city || data.address.regency || data.address.county || data.address.state || "Lokasi Anda";
+                }
+                
+                await fetchWeatherByCoords(lat, lon, cityName);
+            } catch (error) {
+                console.warn("Gagal reverse geocoding:", error);
+                await fetchWeatherByCoords(lat, lon, "Lokasi Saat Ini");
+            }
+        }
+
+        // 4. Ambil data cuaca dari Open-Meteo
+        async function fetchWeatherByCoords(lat, lon, locationNameStr) {
+            try {
+                // API Cuaca dari Open-Meteo (Gratis, tanpa API Key)
+                const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m&timezone=auto`;
+                
+                const response = await fetch(url);
+                if (!response.ok) throw new Error("Gagal mengambil data cuaca");
+                
+                const data = await response.json();
+                updateUI(data.current, locationNameStr);
+
+            } catch (err) {
+                showError("Terjadi kesalahan saat mengambil data cuaca.");
+            }
+        }
+
+        // 5. Update tampilan antarmuka
+        function updateUI(currentWeather, locationNameStr) {
+            loading.classList.add('hidden');
+            loading.classList.remove('flex');
+            
+            // Dapatkan detail berdasarkan kode cuaca WMO
+            const weatherInfo = getWeatherDetails(currentWeather.weather_code);
+            
+            // Perbarui Data Teks
+            document.getElementById('locationName').textContent = locationNameStr;
+            document.getElementById('dateText').textContent = formatTanggal();
+            document.getElementById('temperature').textContent = `${Math.round(currentWeather.temperature_2m)}°`;
+            document.getElementById('weatherDesc').textContent = weatherInfo.desc;
+            
+            document.getElementById('humidity').textContent = `${currentWeather.relative_humidity_2m}%`;
+            document.getElementById('windSpeed').textContent = `${currentWeather.wind_speed_10m} km/h`;
+            document.getElementById('precipitation').textContent = `${currentWeather.precipitation} mm`;
+            document.getElementById('feelsLike').textContent = `${Math.round(currentWeather.apparent_temperature)}°`;
+
+            // Update Icon
+            const iconEl = document.getElementById('weatherIcon');
+            // Ganti ikon matahari dengan bulan jika malam hari dan cuaca cerah/berawan
+            let iconName = weatherInfo.icon;
+            if (currentWeather.is_day === 0) {
+                if (iconName === 'sun') iconName = 'moon';
+                if (iconName === 'sun-dim') iconName = 'moon';
+                if (iconName === 'cloud-sun') iconName = 'cloud-moon';
+            }
+            iconEl.setAttribute('data-lucide', iconName);
+            
+            // Render ulang ikon Lucide
+            lucide.createIcons();
+
+            // Ubah Tema (Background)
+            document.body.className = `min-h-screen flex items-center justify-center p-4 relative transition-all duration-1000 ${weatherInfo.theme}`;
+            
+            // Atur status hujan (Animasi & Peringatan)
+            if (weatherInfo.isRain || currentWeather.precipitation > 0) {
+                document.body.classList.add('raining');
+                rainAlert.classList.remove('hidden');
+            } else {
+                document.body.classList.remove('raining');
+                rainAlert.classList.add('hidden');
+            }
+
+            // Tampilkan konten dengan transisi
+            weatherContent.classList.remove('hidden');
+            // Sedikit delay agar transisi CSS terlihat
+            setTimeout(() => {
+                weatherContent.classList.add('opacity-100');
+            }, 50);
+            
+            // Kosongkan input
+            cityInput.value = '';
+        }
+    </script>
+</body>
+</html>
