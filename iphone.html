@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Simulasi iPhone (iOS) - Pro Max</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #0a0a0a;
+            display: flex; justify-content: center; align-items: center;
+            height: 100vh; margin: 0; overflow: hidden;
+        }
+
+        /* Container utama HP */
+        #iphone-container {
+            width: 375px; height: 812px;
+            background-color: #000; border-radius: 50px;
+            box-shadow: 0 0 0 12px #1f1f1f, 0 0 0 14px #333, 0 30px 60px rgba(0,0,0,0.6);
+            position: relative; overflow: hidden;
+            background: radial-gradient(circle at 50% 10%, #4a729e 0%, #8ca1a6 30%, #e2c0ad 60%, #e89e90 100%);
+            background-size: cover; background-position: center;
+            transition: transform 0.3s ease;
+        }
+
+        @media (max-width: 400px), (max-height: 850px) { #iphone-container { transform: scale(0.85); } }
+        @media (max-width: 350px), (max-height: 700px) { #iphone-container { transform: scale(0.7); } }
+
+        /* Dynamic Island */
+        #dynamic-island {
+            position: absolute; top: 11px; left: 50%; transform: translateX(-50%);
+            width: 120px; height: 35px; background-color: #000; border-radius: 20px;
+            z-index: 50; display: flex; justify-content: space-between; align-items: center; padding: 0 10px;
+            box-shadow: inset 0 0 2px rgba(255,255,255,0.1);
+        }
+        #dynamic-island::after {
+            content: ''; position: absolute; right: 15px; width: 12px; height: 12px;
+            background: #111; border-radius: 50%;
+            box-shadow: inset -2px -2px 4px rgba(255,255,255,0.1), inset 2px 2px 4px rgba(0,0,0,0.8);
+        }
+
+        /* Status Bar */
+        #status-bar {
+            position: absolute; top: 0; left: 0; right: 0; height: 48px;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 30px 0 35px; z-index: 40; color: white; font-size: 15px; font-weight: 600;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.4); transition: color 0.3s ease; pointer-events: none;
+        }
+
+        /* Lock Screen */
+        #lock-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 30;
+            display: flex; flex-direction: column; align-items: center; padding-top: 85px;
+            transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.5s ease;
+        }
+        #lock-screen.unlocked { transform: translateY(-100%); opacity: 0; pointer-events: none; }
+        .lock-time { font-size: 85px; font-weight: 600; line-height: 1; color: rgba(255, 255, 255, 0.9); text-shadow: 0 0 20px rgba(0,0,0,0.2); letter-spacing: -2px; }
+        .lock-date { font-size: 21px; color: rgba(255, 255, 255, 0.9); font-weight: 500; margin-bottom: 5px; text-shadow: 0 0 10px rgba(0,0,0,0.2); }
+
+        /* Home Screen */
+        #home-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 20;
+            padding: 65px 22px 100px 22px; display: grid; grid-template-columns: repeat(4, 1fr);
+            grid-auto-rows: min-content; gap: 24px 18px; opacity: 0; transform: scale(0.9);
+            transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        #home-screen.visible { opacity: 1; transform: scale(1); }
+
+        /* App Icons */
+        .app-icon-wrapper { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
+        .app-icon {
+            width: 62px; height: 62px; border-radius: 14px; display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.2); transition: transform 0.1s ease, filter 0.1s ease; position: relative; overflow: hidden;
+        }
+        .app-icon:active { transform: scale(0.85); filter: brightness(0.7); }
+        .app-name { margin-top: 6px; font-size: 11.5px; color: white; font-weight: 500; text-shadow: 0 1px 3px rgba(0,0,0,0.6); text-align: center; width: 100%; white-space: nowrap; }
+
+        /* Dock */
+        #dock {
+            position: absolute; bottom: 25px; left: 15px; right: 15px; height: 90px;
+            background: rgba(255, 255, 255, 0.3); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+            border-radius: 32px; display: flex; justify-content: space-around; align-items: center; padding: 0 12px;
+            z-index: 20; opacity: 0; transform: translateY(20px); transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        #home-screen.visible ~ #dock { opacity: 1; transform: translateY(0); }
+        #dock .app-name { display: none; } #dock .app-icon { box-shadow: none; }
+
+        /* App View Container */
+        #app-view {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: white; z-index: 40; opacity: 0; transform: scale(0.5); border-radius: 50px;
+            pointer-events: none; transition: opacity 0.3s ease, transform 0.4s cubic-bezier(0.25, 1, 0.3, 1), border-radius 0.3s ease;
+            display: flex; flex-direction: column; overflow: hidden; transform-origin: center center;
+        }
+        #app-view.active { opacity: 1; transform: scale(1) translateY(0) !important; border-radius: 0px; pointer-events: auto; }
+        
+        .app-content { flex: 1; overflow-y: auto; overflow-x: hidden; width: 100%; height: 100%; background: #fff; scrollbar-width: none; }
+        .app-content::-webkit-scrollbar { display: none; }
+
+        /* Home Indicator & Hitbox */
+        #home-indicator-hitbox {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 40px; z-index: 100;
+            cursor: grab; display: flex; justify-content: center; align-items: flex-end; padding-bottom: 8px;
+        }
+        #home-indicator {
+            width: 135px; height: 5px; background-color: white; border-radius: 10px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.2); transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+        #home-indicator-hitbox:active #home-indicator { transform: scaleY(0.8); }
+
+        /* Ikon & Warna */
+        .bg-ios-phone { background: linear-gradient(180deg, #34C759 0%, #28A745 100%); }
+        .bg-ios-messages { background: linear-gradient(180deg, #34C759 0%, #28A745 100%); }
+        .bg-ios-safari { background: white; }
+        .bg-ios-music { background: linear-gradient(180deg, #FF2D55 0%, #E02041 100%); }
+        .bg-ios-weather { background: linear-gradient(180deg, #4facfe 0%, #00f2fe 100%); }
+        .bg-ios-calc { background: linear-gradient(180deg, #FF9500 0%, #FF8A00 100%); }
+        .bg-ios-notes { background: linear-gradient(180deg, #FFD02E 0%, #F5B000 100%); position: relative;}
+        .bg-ios-settings { background: linear-gradient(180deg, #8E8E93 0%, #6C6C70 100%); }
+        .bg-ios-clock { background: black; }
+        .bg-ios-camera { background: linear-gradient(180deg, #E5E5EA 0%, #D1D1D6 100%); }
+        .bg-ios-mail { background: linear-gradient(180deg, #0A78FE 0%, #0056D6 100%); }
+        .bg-ios-photos { background: white; position: relative; }
+        .photos-petal { position: absolute; width: 18px; height: 26px; border-radius: 10px; opacity: 0.8; mix-blend-mode: multiply; }
+        .ios-icon-svg { width: 34px; height: 34px; fill: white; }
+
+        /* Khusus App Pengaturan */
+        .settings-app { background: #F2F2F7; min-height: 100%; padding-top: 50px; padding-bottom: 40px;}
+        .settings-header { padding: 10px 20px 5px 20px; font-size: 34px; font-weight: bold; }
+        .settings-group { background: white; margin: 0 15px 20px 15px; border-radius: 12px; overflow: hidden; }
+        .settings-item { display: flex; align-items: center; padding: 12px 15px; border-bottom: 1px solid #e5e5ea; font-size: 17px; }
+        .settings-item:last-child { border-bottom: none; }
+        
+        /* Khusus Kalkulator */
+        .calc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; padding: 20px; background: black; height: 100%; align-content: end; padding-bottom: 60px; }
+        .calc-display { grid-column: span 4; color: white; font-size: 75px; text-align: right; padding: 10px; word-wrap: break-word; font-weight: 300; line-height: 1; margin-bottom: 10px; }
+        .calc-btn { width: 100%; aspect-ratio: 1; border-radius: 50%; border: none; font-size: 30px; font-weight: 400; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: filter 0.2s; }
+        .calc-btn:active { filter: brightness(1.5); }
+        .calc-btn.num { background: #333333; color: white; } .calc-btn.op { background: #FF9F0A; color: white; font-weight: 500;} .calc-btn.spec { background: #A5A5A5; color: black; } .calc-btn.zero { grid-column: span 2; border-radius: 40px; justify-content: flex-start; padding-left: 30px; aspect-ratio: auto; }
+
+        /* Khusus Telepon */
+        .phone-app { background: white; height: 100%; padding-top: 60px; display: flex; flex-direction: column; }
+        .dialpad-btn { width: 75px; height: 75px; border-radius: 50%; background: #E5E5EA; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 36px; font-weight: 400; transition: background 0.1s; margin: 0 auto;}
+        .dialpad-btn:active { background: #D1D1D6; }
+        .dialpad-sub { font-size: 10px; font-weight: 700; color: #666; letter-spacing: 2px; margin-top: -5px; }
+        .call-btn { width: 75px; height: 75px; border-radius: 50%; background: #34C759; color: white; display: flex; justify-content: center; align-items: center; margin: 0 auto; transition: opacity 0.2s;}
+        .call-btn:active { opacity: 0.7; }
+
+        /* Khusus Safari */
+        .safari-app { background: #F9F9F9; height: 100%; display: flex; flex-direction: column; padding-top: 50px; }
+        .safari-content { flex: 1; overflow-y: auto; padding: 20px; text-align: center;}
+        .safari-bottom-bar { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(20px); border-top: 1px solid #ddd; padding: 10px 15px 30px 15px; display: flex; flex-direction: column; }
+        .safari-address { background: white; border-radius: 12px; height: 44px; display: flex; align-items: center; padding: 0 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+
+        /* Khusus Pesan */
+        .messages-app { background: white; height: 100%; padding-top: 50px; }
+        .chat-item { display: flex; padding: 10px 20px; align-items: center; border-bottom: 1px solid #F2F2F7; }
+        
+        /* Khusus Musik */
+        .music-app { background: linear-gradient(180deg, #4b2a3a 0%, #1a1a1a 100%); height: 100%; color: white; display: flex; flex-direction: column; padding: 60px 25px 30px 25px; }
+        .music-cover { width: 100%; aspect-ratio: 1; background: #333; border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); margin-bottom: 30px; background-image: url('https://picsum.photos/id/237/400/400'); background-size: cover;}
+        
+        /* Khusus Foto */
+        .photos-app { background: white; height: 100%; display: flex; flex-direction: column;}
+        .photos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; flex: 1; overflow-y: auto; padding-top: 50px; padding-bottom: 70px;}
+        .photo-item { aspect-ratio: 1; background-color: #eee; background-size: cover; background-position: center;}
+    </style>
+</head>
+<body>
+
+    <div id="iphone-container">
+        
+        <!-- Status Bar -->
+        <div id="status-bar">
+            <span id="status-time">00:00</span>
+            <div class="flex items-center space-x-1.5" id="status-icons">
+                <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="2" width="3" height="10" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+                <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor"><path d="M8 12C7.4 12 7 11.6 7 11C7 10.4 7.4 10 8 10C8.6 10 9 10.4 9 11C9 11.6 8.6 12 8 12ZM4.4 8.5C5.3 7.6 6.6 7 8 7C9.4 7 10.7 7.6 11.6 8.5C11.8 8.7 12.1 8.7 12.3 8.5C12.5 8.3 12.5 8 12.3 7.8C11.1 6.6 9.6 6 8 6C6.4 6 4.9 6.6 3.7 7.8C3.5 8 3.5 8.3 3.7 8.5C3.9 8.7 4.2 8.7 4.4 8.5ZM1.6 5.6C3.3 3.9 5.6 3 8 3C10.4 3 12.7 3.9 14.4 5.6C14.6 5.8 14.9 5.8 15.1 5.6C15.3 5.4 15.3 5.1 15.1 4.9C13.2 3 10.7 2 8 2C5.3 2 2.8 3 0.9 4.9C0.7 5.1 0.7 5.4 0.9 5.6C1.1 5.8 1.4 5.8 1.6 5.6Z"/></svg>
+                <svg width="25" height="12" viewBox="0 0 25 12" fill="currentColor"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="currentColor" fill="none"/><rect x="2" y="2" width="18" height="8" rx="2" fill="currentColor"/><path d="M23 4V8C23.6 8 24 7.6 24 7V5C24 4.4 23.6 4 23 4Z" fill="currentColor"/></svg>
+            </div>
+        </div>
+
+        <div id="dynamic-island"></div>
+
+        <!-- Lock Screen -->
+        <div id="lock-screen" onclick="unlockPhone()">
+            <div class="flex flex-col items-center mt-4">
+                <div class="flex items-center space-x-2 text-white/90 mb-1">
+                    <svg width="18" height="24" viewBox="0 0 18 24" fill="currentColor"><path d="M14 10V6C14 3.24 11.76 1 9 1C6.24 1 4 3.24 4 6V10H3C1.9 10 1 10.9 1 12V20C1 21.1 1.9 22 3 22H15C16.1 22 17 21.1 17 20V12C17 10.9 16.1 10 15 10H14ZM6 6C6 4.34 7.34 3 9 3C10.66 3 12 4.34 12 6V10H6V6Z"/></svg>
+                </div>
+                <div class="lock-date" id="lock-date">Senin, 1 Jan</div>
+                <div class="lock-time" id="lock-time">00:00</div>
+            </div>
+            
+            <div class="absolute bottom-16 w-full px-12 flex justify-between">
+                <button class="w-[50px] h-[50px] rounded-full bg-black/40 backdrop-blur-xl flex justify-center items-center text-white">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+                </button>
+                <button class="w-[50px] h-[50px] rounded-full bg-black/40 backdrop-blur-xl flex justify-center items-center text-white">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                </button>
+            </div>
+            <div class="absolute bottom-6 text-white text-[13px] font-medium opacity-80 animate-pulse">Geser ke atas untuk membuka</div>
+        </div>
+
+        <!-- Home Screen -->
+        <div id="home-screen"></div>
+
+        <!-- Dock -->
+        <div id="dock"></div>
+
+        <!-- App View -->
+        <div id="app-view">
+            <div id="app-content-area" class="app-content"></div>
+        </div>
+
+        <!-- Home Indicator -->
+        <div id="home-indicator-hitbox"><div id="home-indicator"></div></div>
+    </div>
+
+    <script>
+        // --- State Variables ---
+        let isUnlocked = false;
+        let activeApp = null;
+        let calcVal = '0'; let calcPrev = null; let calcOp = null;
+        let dialerVal = '';
+
+        // --- SVGs untuk Ikon Aplikasi ---
+        const svgs = {
+            weather: `<svg class="ios-icon-svg" viewBox="0 0 64 64"><circle cx="32" cy="28" r="14" fill="#FFD700"/><path d="M46 42c0 5.5-4.5 10-10 10H24c-7.7 0-14-6.3-14-14s6.3-14 14-14c1.2 0 2.3.2 3.4.5C29.6 19.1 35.3 16 42 16c8.8 0 16 7.2 16 16 0 4.1-1.5 7.8-4 10.6C53.7 42.9 53 43 52 43z" fill="white"/></svg>`,
+            calc: `<svg class="ios-icon-svg" viewBox="0 0 64 64"><rect x="14" y="16" width="10" height="4" fill="white" rx="2"/><rect x="17" y="13" width="4" height="10" fill="white" rx="2"/><rect x="40" y="16" width="10" height="4" fill="white" rx="2"/><rect x="14" y="42" width="10" height="4" fill="white" rx="2"/><path d="M42 38l6 6m0-6l-6 6" stroke="white" stroke-width="4" stroke-linecap="round"/><rect x="40" y="40" width="10" height="4" fill="white" rx="2"/><rect x="40" y="46" width="10" height="4" fill="white" rx="2"/></svg>`,
+            notes: `<svg viewBox="0 0 64 64" width="62" height="62" style="position:absolute;top:0;left:0;"><rect width="62" height="18" fill="#FFD02E"/><rect y="18" width="62" height="44" fill="white"/><line x1="10" y1="28" x2="52" y2="28" stroke="#E5E5EA" stroke-width="2"/><line x1="10" y1="38" x2="52" y2="38" stroke="#E5E5EA" stroke-width="2"/><line x1="10" y1="48" x2="40" y2="48" stroke="#E5E5EA" stroke-width="2"/></svg>`,
+            settings: `<svg class="ios-icon-svg" viewBox="0 0 64 64" fill="#E5E5EA"><path d="M41.7 54.3l-2.6-6c-1.8.6-3.7.9-5.7.9h-2.8c-2 0-3.9-.3-5.7-.9l-2.6 6c-.4 1-1.5 1.6-2.6 1.3l-4.7-1.3c-1.1-.3-1.8-1.3-1.5-2.4l1.6-6.3c-1.5-1.3-2.8-2.8-3.9-4.5l-6 2c-1 .3-2.2-.1-2.7-1.1l-2.4-4.2c-.6-1-.2-2.3.8-2.9l5.4-3.5c-.2-1.6-.3-3.2-.3-4.9s.1-3.3.3-4.9l-5.4-3.5c-1-.6-1.3-1.9-.8-2.9l2.4-4.2c.6-1 1.7-1.4 2.7-1.1l6 2c1.1-1.7 2.4-3.2 3.9-4.5l-1.6-6.3c-.3-1.1.4-2.1 1.5-2.4l4.7-1.3c1.1-.3 2.2.3 2.6 1.3l2.6 6c1.8-.6 3.7-.9 5.7-.9h2.8c2 0 3.9.3 5.7.9l2.6-6c.4-1 1.5-1.6 2.6-1.3l4.7 1.3c1.1.3 1.8 1.3 1.5 2.4l-1.6 6.3c1.5 1.3 2.8 2.8 3.9 4.5l6-2c1-.3 2.2.1 2.7 1.1l2.4 4.2c.6 1 .2 2.3-.8 2.9l-5.4 3.5c.2 1.6.3 3.2.3 4.9s-.1 3.3-.3 4.9l5.4 3.5c1 .6 1.3 1.9.8 2.9l-2.4 4.2c-.6 1-1.7 1.4-2.7 1.1l-6-2c-1.1 1.7-2.4 3.2-3.9 4.5l1.6 6.3c.3 1.1-.4 2.1-1.5 2.4l-4.7 1.3c-1.1.3-2.2-.3-2.6-1.3zM32 41c5 0 9-4 9-9s-4-9-9-9-9 4-9 9 4 9 9 9z"/></svg>`,
+            clock: `<svg class="ios-icon-svg" viewBox="0 0 64 64" fill="white"><circle cx="32" cy="32" r="28" stroke="white" stroke-width="4" fill="black"/><circle cx="32" cy="32" r="2" fill="#FF2D55"/><line x1="32" y1="32" x2="32" y2="14" stroke="white" stroke-width="3" stroke-linecap="round"/><line x1="32" y1="32" x2="44" y2="32" stroke="white" stroke-width="3" stroke-linecap="round"/><line x1="32" y1="32" x2="24" y2="40" stroke="#FF2D55" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+            photos: `<div class="photos-petal bg-[#FF3B30]" style="top:12px; left:22px;"></div><div class="photos-petal bg-[#FFCC00]" style="top:22px; left:32px; transform:rotate(90deg);"></div><div class="photos-petal bg-[#4CD964]" style="top:32px; left:22px; transform:rotate(180deg);"></div><div class="photos-petal bg-[#5AC8FA]" style="top:22px; left:12px; transform:rotate(270deg);"></div><div class="photos-petal bg-[#5856D6]" style="top:14px; left:14px; transform:rotate(45deg);"></div><div class="photos-petal bg-[#FF2D55]" style="top:14px; left:30px; transform:rotate(-45deg);"></div>`,
+            camera: `<svg class="ios-icon-svg" viewBox="0 0 64 64" fill="#333"><path d="M46 16h-4l-3-4H25l-3 4h-4c-4.4 0-8 3.6-8 8v22c0 4.4 3.6 8 8 8h28c4.4 0 8-3.6 8-8V24c0-4.4-3.6-8-8-8zm-14 31c-6.1 0-11-4.9-11-11s4.9-11 11-11 11 4.9 11 11-4.9 11-11 11z"/><circle cx="32" cy="36" r="8"/><circle cx="50" cy="22" r="2" fill="#FFCC00"/></svg>`,
+            mail: `<svg class="ios-icon-svg" viewBox="0 0 64 64"><path d="M10 20v24c0 3.3 2.7 6 6 6h32c3.3 0 6-2.7 6-6V20c0-3.3-2.7-6-6-6H16c-3.3 0-6 2.7-6 6zm42.6-1.5L34.1 34.3c-1.2 1-3 1-4.2 0L11.4 18.5c1-1.5 2.7-2.5 4.6-2.5h32c1.9 0 3.6 1 4.6 2.5z" fill="white"/></svg>`,
+            phone: `<svg class="ios-icon-svg" viewBox="0 0 64 64"><path d="M47.7 40.5c-1.6-1.6-4.2-1.6-5.8 0l-3.9 3.9c-1.2.3-2.9-.1-5-1.1-3.6-1.7-6.9-4.8-9-8.4-1.1-1.9-1.5-3.6-1.1-4.9l3.9-3.9c1.6-1.6 1.6-4.2 0-5.8l-7.3-7.3c-1.6-1.6-4.2-1.6-5.8 0l-4.2 4.2C8 18.9 7 21 7.4 23.4c1.1 6.5 4.8 13.9 11 20 6.1 6.1 13.5 9.8 19.9 11 .6.1 1.1.2 1.7.2 1.8 0 3.5-.7 4.7-1.9l4.3-4.3c1.6-1.6 1.6-4.2 0-5.8l-7.3-7.4z" fill="white"/></svg>`,
+            safari: `<svg class="ios-icon-svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="white"/><circle cx="32" cy="32" r="26" stroke="#007AFF" stroke-width="2" fill="none"/><path d="M43 21l-20 6 6 20 20-6-6-20z" fill="#FF3B30"/><path d="M29 27l-6 14 14-6-8-8z" fill="#007AFF"/><circle cx="32" cy="32" r="2" fill="white"/></svg>`,
+            messages: `<svg class="ios-icon-svg" viewBox="0 0 64 64"><path d="M32 12c-15.5 0-28 11.2-28 25 0 8.1 4.5 15.3 11.4 19.9-.5 3-2.1 5.3-2.3 5.5-.3.4-.2 1 .3 1.3.2.1.4.2.6.2.3 0 .5-.1.8-.3 4.3-3.2 7-6.5 8.1-8.1 2.9 1 6 1.5 9.1 1.5 15.5 0 28-11.2 28-25S47.5 12 32 12z" fill="white"/></svg>`,
+            music: `<svg class="ios-icon-svg" viewBox="0 0 64 64"><path d="M44 14L24 18v22c-1.6-1.3-3.7-2-6-2-5 0-9 3.1-9 7s4 7 9 7 9-3.1 9-7V27.3l16-3.2v14.9c-1.6-1.3-3.7-2-6-2-5 0-9 3.1-9 7s4 7 9 7 9-3.1 9-7V16c0-1.1-.9-2-2-2z" fill="white"/></svg>`
+        };
+
+        const appsData = [
+            { id: 'weather', name: 'Cuaca', bgClass: 'bg-ios-weather', dock: false, svg: svgs.weather, render: renderWeather },
+            { id: 'calc', name: 'Kalkulator', bgClass: 'bg-ios-calc', dock: false, svg: svgs.calc, render: renderCalc },
+            { id: 'notes', name: 'Catatan', bgClass: 'bg-ios-notes', dock: false, svg: svgs.notes, render: renderNotes },
+            { id: 'settings', name: 'Pengaturan', bgClass: 'bg-ios-settings', dock: false, svg: svgs.settings, render: renderSettings },
+            { id: 'clock', name: 'Jam', bgClass: 'bg-ios-clock', dock: false, svg: svgs.clock, render: renderClock },
+            { id: 'photos', name: 'Foto', bgClass: 'bg-ios-photos', dock: false, svg: svgs.photos, render: renderPhotos },
+            { id: 'camera', name: 'Kamera', bgClass: 'bg-ios-camera', dock: false, svg: svgs.camera, render: renderEmptyApp },
+            { id: 'mail', name: 'Mail', bgClass: 'bg-ios-mail', dock: false, svg: svgs.mail, render: renderEmptyApp },
+            
+            // Aplikasi Dock
+            { id: 'phone', name: 'Telepon', bgClass: 'bg-ios-phone', dock: true, svg: svgs.phone, render: renderPhone },
+            { id: 'safari', name: 'Safari', bgClass: 'bg-ios-safari', dock: true, svg: svgs.safari, render: renderSafari },
+            { id: 'messages', name: 'Pesan', bgClass: 'bg-ios-messages', dock: true, svg: svgs.messages, render: renderMessages },
+            { id: 'music', name: 'Musik', bgClass: 'bg-ios-music', dock: true, svg: svgs.music, render: renderMusic },
+        ];
+
+        // --- Core Functions ---
+
+        function updateRealTime() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const options = { weekday: 'long', day: 'numeric', month: 'short' };
+            const dateStr = now.toLocaleDateString('id-ID', options);
+
+            document.getElementById('status-time').innerText = `${hours}:${minutes}`;
+            document.getElementById('lock-time').innerText = `${hours}:${minutes}`;
+            document.getElementById('lock-date').innerText = dateStr;
+
+            const appClockEl = document.getElementById('in-app-clock-time');
+            if(appClockEl) {
+                const seconds = String(now.getSeconds()).padStart(2, '0');
+                appClockEl.innerText = `${hours}:${minutes}:${seconds}`;
+            }
+            requestAnimationFrame(updateRealTime);
+        }
+        requestAnimationFrame(updateRealTime);
+
+        function unlockPhone() {
+            if (isUnlocked) return;
+            isUnlocked = true;
+            document.getElementById('lock-screen').classList.add('unlocked');
+            document.getElementById('home-screen').classList.add('visible');
+        }
+
+        // --- Swipe Logic ---
+        let touchStartY = 0; let isSwiping = false;
+        const appView = document.getElementById('app-view');
+        const homeHitbox = document.getElementById('home-indicator-hitbox');
+
+        homeHitbox.addEventListener('touchstart', (e) => {
+            if(!activeApp) return;
+            touchStartY = e.touches[0].clientY; isSwiping = true;
+            appView.style.transition = 'none';
+        });
+
+        homeHitbox.addEventListener('touchmove', (e) => {
+            if (!isSwiping || !activeApp) return;
+            let currentY = e.touches[0].clientY; let deltaY = currentY - touchStartY;
+            if (deltaY < 0) {
+                let scale = Math.max(0.75, 1 - (Math.abs(deltaY) / 600));
+                appView.style.transform = `scale(${scale}) translateY(${deltaY * 0.5}px)`;
+                appView.style.borderRadius = `${Math.min(50, Math.abs(deltaY))}px`; 
+            }
+        });
+
+        homeHitbox.addEventListener('touchend', (e) => {
+            if (!isSwiping || !activeApp) return;
+            isSwiping = false;
+            let deltaY = e.changedTouches[0].clientY - touchStartY;
+            appView.style.transition = 'opacity 0.3s ease, transform 0.4s cubic-bezier(0.25, 1, 0.3, 1), border-radius 0.3s ease';
+            if (deltaY < -40) goHome();
+            else { appView.style.transform = 'scale(1) translateY(0)'; appView.style.borderRadius = '0px'; }
+        });
+
+        homeHitbox.addEventListener('click', () => { if(activeApp) goHome(); });
+
+        function goHome() {
+            if (!activeApp) return;
+            appView.classList.remove('active');
+            document.getElementById('status-bar').style.color = 'white';
+            document.getElementById('home-indicator').style.backgroundColor = 'white';
+            setTimeout(() => {
+                document.getElementById('app-content-area').innerHTML = '';
+                activeApp = null;
+                appView.style.transform = ''; appView.style.borderRadius = '';
+            }, 400); 
+        }
+
+        function openApp(appId) {
+            const app = appsData.find(a => a.id === appId);
+            if (!app) return;
+            activeApp = app;
+            const appContentArea = document.getElementById('app-content-area');
+            
+            // Render UI
+            app.render(appContentArea);
+            
+            appView.style.transform = ''; appView.classList.add('active');
+            
+            // Atur warna status bar sesuai tema app
+            if(['calc', 'clock', 'weather', 'music'].includes(app.id)) {
+                document.getElementById('status-bar').style.color = 'white';
+                document.getElementById('home-indicator').style.backgroundColor = 'white';
+            } else {
+                document.getElementById('status-bar').style.color = 'black';
+                document.getElementById('home-indicator').style.backgroundColor = 'black';
+            }
+        }
+
+        function renderHomeIcons() {
+            const homeContainer = document.getElementById('home-screen');
+            const dockContainer = document.getElementById('dock');
+            appsData.forEach(app => {
+                const iconHTML = `
+                    <div class="app-icon-wrapper" onclick="openApp('${app.id}')">
+                        <div class="app-icon ${app.bgClass}">${app.svg}</div>
+                        <span class="app-name">${app.name}</span>
+                    </div>`;
+                if (app.dock) dockContainer.innerHTML += iconHTML;
+                else homeContainer.innerHTML += iconHTML;
+            });
+        }
+
+        // --- RENDER APPS (UI Fungsional) ---
+
+        // 1. Pengaturan (Sangat Lengkap)
+        function renderSettings(container) {
+            const settingItem = (iconBg, iconSvg, title, value="") => `
+                <div class="settings-item">
+                    <div class="w-7 h-7 ${iconBg} rounded-md flex justify-center items-center text-white mr-3">${iconSvg}</div>
+                    <span class="flex-1">${title}</span>
+                    <span class="text-gray-500 mr-2 text-[15px]">${value}</span>
+                    <span class="text-gray-300">›</span>
+                </div>
+            `;
+            const svgArrow = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M9 5l7 7-7 7"></path></svg>`;
+            
+            container.innerHTML = `
+                <div class="settings-app">
+                    <div class="settings-header">Pengaturan</div>
+                    <div class="bg-white mx-[15px] mb-[20px] rounded-[12px] flex items-center p-3 shadow-sm">
+                        <div class="w-[60px] h-[60px] bg-gray-200 rounded-full flex items-center justify-center text-gray-400 mr-4">
+                            <svg class="w-10 h-10" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                        </div>
+                        <div>
+                            <div class="text-[20px] font-normal text-black">Apple User</div>
+                            <div class="text-[13px] text-gray-500 mt-1">Apple ID, iCloud, Media & Pembelian</div>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
+                        <div class="settings-item"><div class="w-7 h-7 bg-[#FF9500] rounded-md flex justify-center items-center text-white mr-3"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064"></path></svg></div><span class="flex-1">Mode Pesawat</span><div class="w-12 h-7 bg-gray-200 rounded-full flex items-center px-0.5"><div class="w-6 h-6 bg-white rounded-full shadow-md"></div></div></div>
+                        ${settingItem('bg-[#007AFF]', '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 16 12"><path d="M8 12C7.4 12 7 11.6 7 11C7 10.4 7.4 10 8 10C8.6 10 9 10.4 9 11C9 11.6 8.6 12 8 12ZM4.4 8.5C5.3 7.6 6.6 7 8 7C9.4 7 10.7 7.6 11.6 8.5C11.8 8.7 12.1 8.7 12.3 8.5C12.5 8.3 12.5 8 12.3 7.8C11.1 6.6 9.6 6 8 6C6.4 6 4.9 6.6 3.7 7.8C3.5 8 3.5 8.3 3.7 8.5C3.9 8.7 4.2 8.7 4.4 8.5Z"/></svg>', 'Wi-Fi', 'HomeNetwork_5G')}
+                        ${settingItem('bg-[#007AFF]', '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5.636 18.364a9 9 0 010-12.728m12.728 0a9 9 0 010 12.728m-9.9-2.829a5 5 0 010-7.07m7.072 0a5 5 0 010 7.07M12 12v.01"></path></svg>', 'Bluetooth', 'Nyala')}
+                        ${settingItem('bg-[#34C759]', '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="2" width="3" height="10" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>', 'Seluler')}
+                        ${settingItem('bg-[#34C759]', '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>', 'Hotspot Pribadi', 'Mati')}
+                    </div>
+
+                    <div class="settings-group">
+                        ${settingItem('bg-[#FF3B30]', '🔔', 'Pemberitahuan')}
+                        ${settingItem('bg-[#FF2D55]', '🔊', 'Bunyi & Haptik')}
+                        ${settingItem('bg-[#5856D6]', '🌙', 'Fokus')}
+                        ${settingItem('bg-[#5856D6]', '⏳', 'Durasi Layar')}
+                    </div>
+
+                    <div class="settings-group">
+                        ${settingItem('bg-[#8E8E93]', '⚙️', 'Umum')}
+                        ${settingItem('bg-[#8E8E93]', '🎛️', 'Pusat Kontrol')}
+                        ${settingItem('bg-[#007AFF]', 'Aa', 'Tampilan & Kecerahan')}
+                        ${settingItem('bg-[#34C759]', '📱', 'Layar Utama & Perpustakaan')}
+                        ${settingItem('bg-[#007AFF]', '♿', 'Aksesibilitas')}
+                        ${settingItem('bg-[#5AC8FA]', '🖼️', 'Wallpaper')}
+                        ${settingItem('bg-[#000000]', 'S', 'Siri & Pencarian')}
+                        ${settingItem('bg-[#34C759]', '😎', 'Face ID & Kode Sandi')}
+                    </div>
+
+                    <div class="settings-group">
+                        ${settingItem('bg-[#FF3B30]', '🆘', 'Darurat SOS')}
+                        ${settingItem('bg-[#34C759]', '🔋', 'Baterai')}
+                        ${settingItem('bg-[#007AFF]', '✋', 'Privasi & Keamanan')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // 2. Telepon (Dialpad Berfungsi)
+        function renderPhone(container) {
+            dialerVal = '';
+            container.innerHTML = `
+                <div class="phone-app">
+                    <div class="text-4xl text-center h-[60px] mt-4 font-light tracking-widest" id="dialer-display"></div>
+                    <div class="grid grid-cols-3 gap-y-4 px-10 mt-6 flex-1">
+                        <div class="dialpad-btn" onclick="addDial('1')">1<div class="dialpad-sub">&nbsp;</div></div>
+                        <div class="dialpad-btn" onclick="addDial('2')">2<div class="dialpad-sub">ABC</div></div>
+                        <div class="dialpad-btn" onclick="addDial('3')">3<div class="dialpad-sub">DEF</div></div>
+                        <div class="dialpad-btn" onclick="addDial('4')">4<div class="dialpad-sub">GHI</div></div>
+                        <div class="dialpad-btn" onclick="addDial('5')">5<div class="dialpad-sub">JKL</div></div>
+                        <div class="dialpad-btn" onclick="addDial('6')">6<div class="dialpad-sub">MNO</div></div>
+                        <div class="dialpad-btn" onclick="addDial('7')">7<div class="dialpad-sub">PQRS</div></div>
+                        <div class="dialpad-btn" onclick="addDial('8')">8<div class="dialpad-sub">TUV</div></div>
+                        <div class="dialpad-btn" onclick="addDial('9')">9<div class="dialpad-sub">WXYZ</div></div>
+                        <div class="dialpad-btn" onclick="addDial('*')">*</div>
+                        <div class="dialpad-btn" onclick="addDial('0')">0<div class="dialpad-sub">+</div></div>
+                        <div class="dialpad-btn" onclick="addDial('#')">#</div>
+                    </div>
+                    <div class="flex justify-center items-center h-[120px] relative">
+                        <div class="call-btn" onclick="alert('Memanggil ' + dialerVal + '...')">
+                            <svg class="w-10 h-10" fill="currentColor" viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+                        </div>
+                        <div class="absolute right-12 text-gray-400 text-2xl" onclick="delDial()">⌫</div>
+                    </div>
+                </div>
+            `;
+        }
+        function addDial(num) { 
+            if(dialerVal.length < 15) dialerVal += num; 
+            document.getElementById('dialer-display').innerText = formatPhoneNumber(dialerVal); 
+        }
+        function delDial() { 
+            dialerVal = dialerVal.slice(0, -1); 
+            document.getElementById('dialer-display').innerText = formatPhoneNumber(dialerVal); 
+        }
+        function formatPhoneNumber(str) {
+            if(str.length > 4 && str.length <= 8) return str.slice(0,4) + '-' + str.slice(4);
+            if(str.length > 8) return str.slice(0,4) + '-' + str.slice(4,8) + '-' + str.slice(8);
+            return str;
+        }
+
+        // 3. Safari
+        function renderSafari(container) {
+            container.innerHTML = `
+                <div class="safari-app">
+                    <div class="safari-content">
+                        <h1 class="text-4xl font-bold mt-10 mb-6 text-gray-800 tracking-tighter">Google</h1>
+                        <div class="w-full h-12 rounded-full border border-gray-300 shadow-sm flex items-center px-4 mb-6">
+                            <span class="text-gray-400 mr-2">🔍</span> <span class="text-gray-400">Telusuri atau ketik URL</span>
+                        </div>
+                        <div class="grid grid-cols-4 gap-4 px-2">
+                            <div class="flex flex-col items-center"><div class="w-14 h-14 bg-gray-200 rounded-xl mb-1 flex items-center justify-center text-xl">🍎</div><span class="text-xs text-gray-600">Apple</span></div>
+                            <div class="flex flex-col items-center"><div class="w-14 h-14 bg-gray-200 rounded-xl mb-1 flex items-center justify-center text-xl">▶️</div><span class="text-xs text-gray-600">YouTube</span></div>
+                            <div class="flex flex-col items-center"><div class="w-14 h-14 bg-gray-200 rounded-xl mb-1 flex items-center justify-center text-xl">🛒</div><span class="text-xs text-gray-600">Amazon</span></div>
+                            <div class="flex flex-col items-center"><div class="w-14 h-14 bg-gray-200 rounded-xl mb-1 flex items-center justify-center text-xl">📰</div><span class="text-xs text-gray-600">Berita</span></div>
+                        </div>
+                    </div>
+                    <div class="safari-bottom-bar">
+                        <div class="safari-address">
+                            <span class="text-[#007AFF] font-bold mr-2 text-sm">Aa</span>
+                            <span class="flex-1 text-center text-gray-800 text-sm">google.com</span>
+                            <span class="text-gray-400 ml-2">↻</span>
+                        </div>
+                        <div class="flex justify-between items-center px-4 mt-4 text-[#007AFF] text-xl">
+                            <span><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M15 19l-7-7 7-7"></path></svg></span>
+                            <span><svg class="w-6 h-6 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M9 5l7 7-7 7"></path></svg></span>
+                            <span><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg></span>
+                            <span><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg></span>
+                            <span><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 4. Pesan
+        function renderMessages(container) {
+            const chat = (name, text, time, unread=false) => `
+                <div class="chat-item">
+                    <div class="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-xl text-white mr-3">${name[0]}</div>
+                    <div class="flex-1 overflow-hidden">
+                        <div class="flex justify-between items-end mb-1">
+                            <span class="font-semibold text-[16px]">${name}</span>
+                            <span class="text-gray-400 text-[13px]">${time}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-500 text-[14px] truncate flex-1 mr-2">${text}</span>
+                            ${unread ? '<div class="w-2.5 h-2.5 bg-[#007AFF] rounded-full"></div>' : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.innerHTML = `
+                <div class="messages-app">
+                    <div class="flex justify-between items-center px-4 mb-2">
+                        <span class="text-[#007AFF] text-[17px]">Edit</span>
+                        <span class="text-[#007AFF]"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg></span>
+                    </div>
+                    <h1 class="text-[34px] font-bold px-4 mb-2">Pesan</h1>
+                    <div class="px-4 mb-4"><div class="w-full bg-gray-100 rounded-lg h-9 flex items-center px-3 text-gray-500 text-[15px]">🔍 Cari</div></div>
+                    <div>
+                        ${chat('Budi Santoso', 'Hei, apakah kamu sudah mengerjakan laporan?', '09.41', true)}
+                        ${chat('Ibu ❤️', 'Nanti pulang jam berapa nak?', 'Kemarin')}
+                        ${chat('Grup Keluarga', 'Ayah: Jangan lupa makan malam.', 'Kemarin')}
+                        ${chat('Joko', 'Siap, OTW sekarang ya bro!', 'Senin')}
+                        ${chat('Telkomsel', 'Paket Internet Anda telah aktif.', 'Minggu')}
+                        ${chat('Shopee', 'Promo Spesial untukmu! Buka aplikasi sekarang.', '1 Mar')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // 5. Musik
+        function renderMusic(container) {
+            container.innerHTML = `
+                <div class="music-app">
+                    <div class="w-12 h-1 bg-white/30 rounded-full mx-auto mb-6"></div>
+                    <div class="music-cover"></div>
+                    
+                    <div class="flex justify-between items-end mb-6">
+                        <div>
+                            <h2 class="text-2xl font-bold">Lagu Favorit Simulasi</h2>
+                            <p class="text-lg text-white/60">Penyanyi Apple</p>
+                        </div>
+                        <div class="w-8 h-8 rounded-full bg-white/20 flex justify-center items-center">⋯</div>
+                    </div>
+                    
+                    <div class="w-full h-1.5 bg-white/20 rounded-full mb-2">
+                        <div class="w-1/3 h-full bg-white rounded-full relative">
+                            <div class="absolute right-0 top-1/2 transform -translate-y-1/2 w-3 h-3 bg-white rounded-full"></div>
+                        </div>
+                    </div>
+                    <div class="flex justify-between text-xs text-white/50 mb-8 font-medium">
+                        <span>1:12</span><span>-2:34</span>
+                    </div>
+                    
+                    <div class="flex justify-between items-center px-6 mb-12">
+                        <svg class="w-10 h-10 fill-current" viewBox="0 0 24 24"><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg>
+                        <div class="w-16 h-16 bg-white rounded-full flex justify-center items-center text-black">
+                            <svg class="w-8 h-8 fill-current" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                        </div>
+                        <svg class="w-10 h-10 fill-current" viewBox="0 0 24 24"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg>
+                    </div>
+                    
+                    <div class="flex justify-between items-center px-4 text-white/60">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 6. Foto (Galeri Grid)
+        function renderPhotos(container) {
+            let photosHTML = '';
+            // Generate random image grid from picsum
+            for(let i=10; i<=30; i++) {
+                photosHTML += `<div class="photo-item" style="background-image: url('https://picsum.photos/id/${i}/150/150')"></div>`;
+            }
+            container.innerHTML = `
+                <div class="photos-app">
+                    <div class="flex justify-between items-center px-4 mb-2">
+                        <span class="text-3xl font-bold">Perpustakaan</span>
+                        <span class="text-[#007AFF] bg-gray-100 rounded-full px-3 py-1 text-sm font-semibold">Pilih</span>
+                    </div>
+                    <div class="photos-grid">
+                        ${photosHTML}
+                    </div>
+                    <div class="absolute bottom-0 w-full bg-white/90 backdrop-blur-md border-t border-gray-200 flex justify-around py-2 pb-6 z-10 text-[10px] text-gray-500">
+                        <div class="flex flex-col items-center text-[#007AFF]"><svg class="w-6 h-6 mb-1" fill="currentColor" viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>Perpustakaan</div>
+                        <div class="flex flex-col items-center"><svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>Untuk Anda</div>
+                        <div class="flex flex-col items-center"><svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>Album</div>
+                        <div class="flex flex-col items-center"><svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>Cari</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- Fitur Ringan lainnya (Kalkulator, Cuaca, Notes, Empty) ---
+        function renderCalc(container) {
+            container.innerHTML = `<div class="calc-grid"><div class="calc-display" id="calc-display">${calcVal}</div><button class="calc-btn spec" onclick="calcInput('clear')">AC</button><button class="calc-btn spec" onclick="calcInput('neg')">+/-</button><button class="calc-btn spec" onclick="calcInput('%')">%</button><button class="calc-btn op" onclick="calcInput('/')">÷</button><button class="calc-btn num" onclick="calcInput('7')">7</button><button class="calc-btn num" onclick="calcInput('8')">8</button><button class="calc-btn num" onclick="calcInput('9')">9</button><button class="calc-btn op" onclick="calcInput('*')">×</button><button class="calc-btn num" onclick="calcInput('4')">4</button><button class="calc-btn num" onclick="calcInput('5')">5</button><button class="calc-btn num" onclick="calcInput('6')">6</button><button class="calc-btn op" onclick="calcInput('-')">-</button><button class="calc-btn num" onclick="calcInput('1')">1</button><button class="calc-btn num" onclick="calcInput('2')">2</button><button class="calc-btn num" onclick="calcInput('3')">3</button><button class="calc-btn op" onclick="calcInput('+')">+</button><button class="calc-btn num zero" onclick="calcInput('0')">0</button><button class="calc-btn num" onclick="calcInput('.')">,</button><button class="calc-btn op" onclick="calcInput('=')">=</button></div>`;
+        }
+        function calcInput(key) {
+            if (['+', '-', '*', '/'].includes(key)) { calcPrev = calcVal; calcOp = key; calcVal = '0'; } 
+            else if (key === '=') { if (calcPrev !== null && calcOp !== null) { try { calcVal = String(eval(`${calcPrev} ${calcOp} ${calcVal}`)); if(calcVal.includes('.')) calcVal = parseFloat(calcVal).toFixed(4).replace(/\.?0+$/, ""); } catch (e) { calcVal = 'Error'; } calcPrev = null; calcOp = null; } } 
+            else if (key === 'clear') { calcVal = '0'; calcPrev = null; calcOp = null; } 
+            else if (key === 'neg') { calcVal = String(parseFloat(calcVal) * -1); } 
+            else if (key === '%') { calcVal = String(parseFloat(calcVal) / 100); } 
+            else if (key === '.') { if (!calcVal.includes('.')) calcVal += '.'; } 
+            else { if (calcVal === '0') calcVal = key; else calcVal += key; if(calcVal.length > 9) calcVal = calcVal.substring(0, 9); }
+            const display = document.getElementById('calc-display'); if(display) display.innerText = calcVal.replace('.', ',');
+        }
+
+        function renderWeather(container) { container.innerHTML = `<div class="weather-app flex flex-col items-center pt-10 text-white" style="background: linear-gradient(to bottom, #2b619e, #629cd9); height:100%"><h1 class="text-4xl font-normal mb-1">Jakarta</h1><div class="text-[90px] font-thin leading-none mb-1">32&deg;</div><div class="text-xl font-medium">Cerah Berawan</div><div class="text-md mt-1 font-medium">T:34&deg; R:26&deg;</div><div class="mt-12 bg-white/20 backdrop-blur-xl rounded-3xl w-11/12 p-4 shadow-lg"><p class="text-sm mb-3 border-b border-white/30 pb-2 flex items-center">PRAKIRAAN CUACA 24 JAM</p><div class="flex justify-between text-center font-medium"><div><p class="mb-2 text-sm">Sek.</p><div class="text-2xl mb-2">☀️</div><p>32&deg;</p></div><div><p class="mb-2 text-sm">12.00</p><div class="text-2xl mb-2">☀️</div><p>34&deg;</p></div><div><p class="mb-2 text-sm">15.00</p><div class="text-2xl mb-2">⛅</div><p>33&deg;</p></div><div><p class="mb-2 text-sm">18.00</p><div class="text-2xl mb-2">☁️</div><p>29&deg;</p></div></div></div></div>`; }
+        function renderClock(container) { container.innerHTML = `<div class="clock-app bg-black text-white h-full p-5 pt-10"><h1 class="text-3xl font-bold mb-8">Jam Dunia</h1><div class="flex justify-between items-end border-b border-gray-800 pb-4"><div><p class="text-gray-400 text-sm">Hari Ini</p><h2 class="text-2xl font-medium">Jakarta</h2></div><div class="text-[50px] font-light leading-none tracking-wide" id="in-app-clock-time">00:00:00</div></div></div>`; }
+        function renderNotes(container) { container.innerHTML = `<div class="bg-white h-full flex flex-col pt-12"><div class="flex justify-between items-center px-4 pb-2 border-b border-gray-200"><span class="text-[#D4AF37] text-lg font-medium">‹ Folders</span></div><div class="px-5 pt-3"><p class="text-gray-400 text-xs text-center mb-4">1 Maret 2024 pukul 09.41</p><textarea class="w-full h-[500px] border-none outline-none text-lg resize-none" placeholder="Mulai mengetik catatan..."></textarea></div></div>`; }
+        function renderEmptyApp(container) { container.innerHTML = `<div class="flex flex-col items-center justify-center h-full text-gray-500 bg-white"><div class="w-20 h-20 rounded-2xl ${activeApp.bgClass} flex items-center justify-center mb-4 shadow-md opacity-60">${activeApp.svg}</div><h2 class="text-2xl font-semibold mb-2 text-black">${activeApp.name}</h2><p class="text-sm text-center px-6">Fitur ini belum diaktifkan.</p></div>`; }
+
+        renderHomeIcons();
+    </script>
+</body>
+</html>
