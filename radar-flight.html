@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radar Pesawat Masa Nyata</title>
+    
+    <!-- Memuatkan Tailwind CSS untuk reka bentuk antaramuka pengguna -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Memuatkan Leaflet CSS untuk Peta -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <style>
+        /* Memastikan peta mengambil keseluruhan skrin */
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #map {
+            height: 100%;
+            width: 100%;
+            z-index: 1; /* Peta di belakang antaramuka */
+        }
+        .ui-overlay {
+            z-index: 1000; /* Antaramuka di atas peta */
+        }
+        
+        /* Ikon pesawat tersuai */
+        .plane-icon {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 30px;
+            height: 30px;
+            transition: transform 1s linear; /* Animasi putaran yang lancar */
+        }
+        .plane-icon svg {
+            filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.5));
+        }
+        
+        /* Animasi pergerakan marker di peta agar terlihat mulus saat update (efek realtime) */
+        .leaflet-marker-icon {
+            transition: transform 1.5s ease-in-out !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white relative">
+
+    <!-- Kontena Peta -->
+    <div id="map"></div>
+
+    <!-- Panel Maklumat (Antaramuka Pengguna) -->
+    <div class="ui-overlay absolute top-4 left-4 right-4 md:left-auto md:right-4 md:w-80 flex flex-col gap-3 pointer-events-none">
+        
+        <!-- Kad Tajuk & Status -->
+        <div class="bg-slate-900/80 backdrop-blur-md border border-slate-700 p-4 rounded-xl shadow-2xl pointer-events-auto">
+            <h1 class="text-xl font-bold text-blue-400 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Radar Penerbangan
+            </h1>
+            <p class="text-sm text-gray-400 mt-1">Data langsung dari OpenSky Network</p>
+            
+            <div class="mt-4 flex justify-between items-center border-t border-slate-700 pt-3">
+                <div>
+                    <p class="text-xs text-gray-400">Pesawat Kelihatan</p>
+                    <p id="plane-count" class="text-2xl font-bold text-white">0</p>
+                </div>
+                <button id="refresh-btn" onclick="fetchPlanesData()" class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1">
+                    <svg id="refresh-icon" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Segar Semula
+                </button>
+            </div>
+        </div>
+
+        <!-- Mesej Ralat / Amaran -->
+        <div id="error-box" class="hidden bg-red-900/80 backdrop-blur-md border border-red-500 p-3 rounded-xl shadow-lg pointer-events-auto">
+            <p class="text-sm text-red-200">
+                <strong>Gagal memuat turun data!</strong><br>
+                API OpenSky mengehadkan permintaan awam. Sila zum masuk atau cuba sebentar lagi.
+            </p>
+        </div>
+    </div>
+
+    <!-- Memuatkan skrip Leaflet -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <script>
+        // Inisialisasi peta Leaflet
+        // Koordinat lalai ditetapkan berhampiran Jakarta/Bekasi [Lat, Lng], Tahap Zum: 6
+        const map = L.map('map').setView([-6.2, 107.0], 6);
+
+        // Menambah lapisan jubin dari OpenStreetMap (Peta Gelap/Standard)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 19
+        }).addTo(map);
+
+        // Objek untuk menyimpan penanda pesawat yang aktif
+        let planeMarkers = {};
+        
+        // Pemasa untuk mengemas kini data secara automatik
+        let updateInterval;
+
+        // Database sederhana maskapai (berdasarkan 3 huruf pertama Callsign ICAO)
+        const airlineData = {
+            'GIA': 'Garuda Indonesia', 'LNI': 'Lion Air', 'CTV': 'Citilink',
+            'BTK': 'Batik Air', 'SJY': 'Sriwijaya Air', 'AWQ': 'Indonesia AirAsia',
+            'SIA': 'Singapore Airlines', 'MAS': 'Malaysia Airlines', 'THY': 'Turkish Airlines',
+            'QFA': 'Qantas', 'UAE': 'Emirates', 'QTR': 'Qatar Airways',
+            'JST': 'Jetstar', 'AXM': 'AirAsia', 'XAX': 'AirAsia X',
+            'CEN': 'Batik Air', 'SNB': 'Pelita Air', 'NAM': 'NAM Air',
+            'TGG': 'Scoot', 'KAL': 'Korean Air', 'ANA': 'All Nippon Airways',
+            'JAL': 'Japan Airlines', 'CPA': 'Cathay Pacific', 'EVA': 'EVA Air'
+        };
+
+        // Fungsi mengubah derajat arah menjadi kompas
+        function getCompassDirection(heading) {
+            if (heading === null || heading === undefined) return 'Tidak diketahui';
+            const val = Math.floor((heading / 22.5) + 0.5);
+            const arr = ["Utara", "Utara Timur Laut", "Timur Laut", "Timur-Timur Laut", "Timur", "Timur-Tenggara", "Tenggara", "Selatan-Tenggara", "Selatan", "Selatan Barat Daya", "Barat Daya", "Barat-Barat Daya", "Barat", "Barat-Barat Laut", "Barat Laut", "Utara-Barat Laut"];
+            return arr[(val % 16)];
+        }
+
+        // Ikon SVG untuk pesawat
+        function createPlaneSvg(heading, altitude) {
+            // Warnakan pesawat berdasarkan ketinggian (Lebih tinggi = lebih putih/biru muda, rendah = biru tua)
+            let color = '#3b82f6'; // Biru lalai
+            if (altitude > 10000) color = '#93c5fd';
+            if (altitude > 30000) color = '#ffffff';
+
+            return `
+                <div class="plane-icon" style="transform: rotate(${heading}deg);">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+                        <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" fill="${color}"/>
+                    </svg>
+                </div>
+            `;
+        }
+
+        // Fungsi utama untuk mengambil data penerbangan
+        async function fetchPlanesData() {
+            const btnIcon = document.getElementById('refresh-icon');
+            const errorBox = document.getElementById('error-box');
+            
+            // Animasi ikon pusingan semasa memuat turun
+            btnIcon.classList.add('animate-spin');
+            errorBox.classList.add('hidden');
+
+            try {
+                // Dapatkan sempadan kotak peta (Bounding Box) untuk mengelakkan muat turun data seluruh dunia
+                const bounds = map.getBounds();
+                const lamin = bounds.getSouth();
+                const lamax = bounds.getNorth();
+                const lomin = bounds.getWest();
+                const lomax = bounds.getEast();
+
+                // URL API OpenSky dengan parameter sempadan
+                const apiUrl = `https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`;
+                
+                const response = await fetch(apiUrl);
+                
+                if (!response.ok) {
+                    throw new Error('Had kadar API dicapai atau ralat pelayan.');
+                }
+
+                const data = await response.json();
+                updateMapWithPlanes(data.states || []);
+            } catch (error) {
+                console.error("Ralat memuat turun data:", error);
+                errorBox.classList.remove('hidden');
+            } finally {
+                // Hentikan animasi pusingan
+                btnIcon.classList.remove('animate-spin');
+            }
+        }
+
+        // Fungsi untuk mengemas kini penanda pesawat di peta
+        function updateMapWithPlanes(states) {
+            document.getElementById('plane-count').innerText = states.length;
+
+            // Simpan senarai ID (icao24) pesawat yang dikesan dalam pusingan ini
+            const currentPlaneIds = new Set();
+
+            states.forEach(state => {
+                const icao24 = state[0];          // ID unik pesawat
+                const callsign = state[1] ? state[1].trim() : 'Tidak diketahui'; // Nama Panggilan
+                const originCountry = state[2];   // Negara Asal
+                const longitude = state[5];       // Longitud
+                const latitude = state[6];        // Latitud
+                const altitude = state[7];        // Ketinggian (meter)
+                const velocity = state[9];        // Kelajuan (m/s)
+                const trueTrack = state[10];      // Arah haluan (darjah)
+
+                // Hanya proses jika ada koordinat yang sah
+                if (latitude && longitude) {
+                    currentPlaneIds.add(icao24);
+                    
+                    // Ekstrak data maskapai dan arah
+                    const callsignPrefix = callsign !== 'Tidak diketahui' ? callsign.substring(0, 3).toUpperCase() : '';
+                    const airlineName = airlineData[callsignPrefix] || 'Maskapai/Pesawat Pribadi';
+                    const directionStr = getCompassDirection(trueTrack);
+                    
+                    // Kandungan maklumat "Popup"
+                    const popupContent = `
+                        <div class="text-gray-800 text-sm min-w-[200px]">
+                            <h3 class="font-bold text-lg mb-1 border-b pb-1 text-blue-600">${callsign}</h3>
+                            <p class="text-xs font-bold text-gray-500 uppercase mb-2">${airlineName}</p>
+                            <p><strong>Arah Tujuan:</strong> ${directionStr} (${trueTrack ? Math.round(trueTrack) + '°' : 'N/A'})</p>
+                            <p><strong>Negara Asal:</strong> ${originCountry}</p>
+                            <p><strong>Ketinggian:</strong> ${altitude ? Math.round(altitude) + ' m' : 'N/A'}</p>
+                            <p><strong>Kelajuan:</strong> ${velocity ? Math.round(velocity * 3.6) + ' km/j' : 'N/A'}</p>
+                        </div>
+                    `;
+
+                    // Ikon tersuai HTML (DivIcon) untuk membolehkan putaran CSS
+                    const icon = L.divIcon({
+                        html: createPlaneSvg(trueTrack || 0, altitude || 0),
+                        className: '', // Kosongkan kelas lalai Leaflet
+                        iconSize: [30, 30],
+                        iconAnchor: [15, 15],
+                        popupAnchor: [0, -15]
+                    });
+
+                    // Jika pesawat sudah ada dalam peta, kemas kini posisinya
+                    if (planeMarkers[icao24]) {
+                        planeMarkers[icao24].setLatLng([latitude, longitude]);
+                        planeMarkers[icao24].setIcon(icon);
+                        planeMarkers[icao24].getPopup().setContent(popupContent);
+                    } 
+                    // Jika pesawat baru, tambahkan penanda baru
+                    else {
+                        const marker = L.marker([latitude, longitude], { icon: icon }).addTo(map);
+                        marker.bindPopup(popupContent);
+                        planeMarkers[icao24] = marker;
+                    }
+                }
+            });
+
+            // Buang pesawat yang telah hilang dari pandangan atau data
+            for (const id in planeMarkers) {
+                if (!currentPlaneIds.has(id)) {
+                    map.removeLayer(planeMarkers[id]);
+                    delete planeMarkers[id];
+                }
+            }
+        }
+
+        // Muat turun data apabila halaman sedia
+        fetchPlanesData();
+
+        // Tetapkan masa muat turun semula setiap 10 saat (Limit API awam, tapi lebih realtime)
+        updateInterval = setInterval(fetchPlanesData, 10000);
+
+        // Kemas kini data apabila pengguna memindahkan/zum peta
+        map.on('moveend', () => {
+            fetchPlanesData();
+            // Semula tetapkan pemasa agar tidak bertembung dengan pergerakan manual pengguna
+            clearInterval(updateInterval);
+            updateInterval = setInterval(fetchPlanesData, 10000);
+        });
+
+    </script>
+</body>
+</html>
