@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Absensi Siswa Modern</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: '#4F46E5', // Indigo 600
+                        secondary: '#10B981', // Emerald 500
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8; 
+        }
+        .nav-active {
+            background-color: #EEF2FF;
+            color: #4F46E5;
+            border-right: 3px solid #4F46E5;
+        }
+        .toast-enter {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        .toast-enter-active {
+            transform: translateX(0);
+            opacity: 1;
+            transition: all 0.3s ease-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans h-screen flex overflow-hidden">
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-white shadow-lg z-10 flex flex-col transition-all duration-300">
+        <div class="h-16 flex items-center px-6 border-b border-gray-100">
+            <i data-lucide="graduation-cap" class="text-primary w-8 h-8 mr-3"></i>
+            <h1 class="text-xl font-bold text-gray-800 tracking-tight">Hadir<span class="text-primary">Dong</span></h1>
+        </div>
+        
+        <nav class="flex-1 py-4">
+            <ul class="space-y-1">
+                <li>
+                    <a href="#" onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-active flex items-center px-6 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-primary transition-colors">
+                        <i data-lucide="layout-dashboard" class="w-5 h-5 mr-3"></i>
+                        Dashboard
+                    </a>
+                </li>
+                <li>
+                    <a href="#" onclick="switchTab('siswa')" id="nav-siswa" class="flex items-center px-6 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-primary transition-colors">
+                        <i data-lucide="users" class="w-5 h-5 mr-3"></i>
+                        Data Siswa
+                    </a>
+                </li>
+                <li>
+                    <a href="#" onclick="switchTab('riwayat')" id="nav-riwayat" class="flex items-center px-6 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-primary transition-colors">
+                        <i data-lucide="history" class="w-5 h-5 mr-3"></i>
+                        Riwayat Absensi
+                    </a>
+                </li>
+            </ul>
+        </nav>
+
+        <div class="p-4 border-t border-gray-100">
+            <div class="flex items-center">
+                <div class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-lg">
+                    A
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm font-semibold">Admin Sekolah</p>
+                    <p class="text-xs text-gray-500">Tahun Ajaran 2025/2026</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-screen overflow-hidden relative">
+        <!-- Header -->
+        <header class="h-16 bg-white shadow-sm flex items-center justify-between px-8 z-0">
+            <h2 id="page-title" class="text-xl font-semibold text-gray-800">Dashboard</h2>
+            <div class="flex items-center space-x-4">
+                <div class="bg-indigo-50 text-primary px-4 py-2 rounded-full text-sm font-medium flex items-center">
+                    <i data-lucide="calendar" class="w-4 h-4 mr-2"></i>
+                    <span id="current-date">Kamis, 5 Maret 2026</span>
+                </div>
+                <div class="bg-gray-100 text-gray-700 px-4 py-2 rounded-full text-sm font-medium flex items-center">
+                    <i data-lucide="clock" class="w-4 h-4 mr-2"></i>
+                    <span id="current-time">08:00:00</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Content Area -->
+        <div class="flex-1 overflow-y-auto p-8">
+            
+            <!-- VIEW: DASHBOARD -->
+            <div id="view-dashboard" class="space-y-6">
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <!-- Total -->
+                    <div class="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 flex items-center justify-between hover:shadow-md transition-shadow">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500 mb-1">Total Siswa</p>
+                            <h3 class="text-3xl font-bold text-gray-800" id="stat-total">0</h3>
+                        </div>
+                        <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                            <i data-lucide="users" class="w-6 h-6"></i>
+                        </div>
+                    </div>
+                    <!-- Hadir -->
+                    <div class="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 flex items-center justify-between hover:shadow-md transition-shadow">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500 mb-1">Hadir</p>
+                            <h3 class="text-3xl font-bold text-emerald-600" id="stat-hadir">0</h3>
+                        </div>
+                        <div class="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                            <i data-lucide="user-check" class="w-6 h-6"></i>
+                        </div>
+                    </div>
+                    <!-- Izin/Sakit -->
+                    <div class="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 flex items-center justify-between hover:shadow-md transition-shadow">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500 mb-1">Izin / Sakit</p>
+                            <h3 class="text-3xl font-bold text-amber-500" id="stat-izin">0</h3>
+                        </div>
+                        <div class="w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center">
+                            <i data-lucide="file-text" class="w-6 h-6"></i>
+                        </div>
+                    </div>
+                    <!-- Alpa -->
+                    <div class="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 flex items-center justify-between hover:shadow-md transition-shadow">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500 mb-1">Alpa (Tanpa Ket)</p>
+                            <h3 class="text-3xl font-bold text-red-500" id="stat-alpa">0</h3>
+                        </div>
+                        <div class="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center">
+                            <i data-lucide="user-x" class="w-6 h-6"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity Preview -->
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                        <h3 class="text-lg font-semibold text-gray-800">Aktivitas Terakhir</h3>
+                        <button onclick="switchTab('riwayat')" class="text-sm text-primary hover:underline font-medium">Lihat Semua</button>
+                    </div>
+                    <div class="p-0">
+                        <ul id="dashboard-recent-logs" class="divide-y divide-gray-50">
+                            <!-- Logs will be populated here -->
+                            <li class="p-6 text-center text-gray-500 text-sm">Belum ada aktivitas absensi hari ini.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: DATA SISWA -->
+            <div id="view-siswa" class="hidden space-y-6">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div class="relative w-full sm:w-64">
+                        <i data-lucide="search" class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4"></i>
+                        <input type="text" id="search-siswa" placeholder="Cari nama atau NIS..." class="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
+                    </div>
+                    <button onclick="openModal()" class="bg-primary hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center">
+                        <i data-lucide="plus" class="w-4 h-4 mr-2"></i>
+                        Tambah Siswa
+                    </button>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                                    <th class="px-6 py-4 font-medium">NIS</th>
+                                    <th class="px-6 py-4 font-medium">Nama Siswa</th>
+                                    <th class="px-6 py-4 font-medium">Kelas</th>
+                                    <th class="px-6 py-4 font-medium">Status Hari Ini</th>
+                                    <th class="px-6 py-4 font-medium text-right">Aksi Absensi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="student-table-body" class="divide-y divide-gray-100">
+                                <!-- Student rows will be generated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="empty-state-siswa" class="hidden p-8 text-center">
+                        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
+                            <i data-lucide="users" class="w-8 h-8 text-gray-400"></i>
+                        </div>
+                        <h3 class="text-lg font-medium text-gray-900">Belum ada data siswa</h3>
+                        <p class="text-sm text-gray-500 mt-1">Tambahkan siswa baru untuk mulai melakukan absensi.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: RIWAYAT -->
+            <div id="view-riwayat" class="hidden space-y-6">
+                <div class="flex justify-between items-center">
+                    <p class="text-gray-600 text-sm">Catatan absensi harian secara real-time.</p>
+                    <button onclick="clearLogs()" class="text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center">
+                        <i data-lucide="trash-2" class="w-4 h-4 mr-2"></i>
+                        Bersihkan Riwayat
+                    </button>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden p-6">
+                    <div class="relative border-l-2 border-gray-100 ml-3 space-y-8" id="full-history-logs">
+                        <!-- History timeline will be populated here -->
+                    </div>
+                    <div id="empty-state-riwayat" class="hidden p-8 text-center">
+                        <i data-lucide="clock" class="w-12 h-12 text-gray-300 mx-auto mb-3"></i>
+                        <p class="text-sm text-gray-500">Belum ada riwayat absensi.</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Modal Tambah Siswa -->
+    <div id="modal-add-student" class="fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md transform scale-95 transition-transform duration-300" id="modal-content">
+            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-gray-800">Tambah Siswa Baru</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 focus:outline-none">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <form id="form-add-student" onsubmit="handleAddStudent(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Nomor Induk Siswa (NIS)</label>
+                    <input type="text" id="input-nis" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-shadow" placeholder="Contoh: 100123">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Nama Lengkap</label>
+                    <input type="text" id="input-nama" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-shadow" placeholder="Masukkan nama lengkap">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Kelas</label>
+                    <select id="input-kelas" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-shadow bg-white">
+                        <option value="" disabled selected>Pilih Kelas</option>
+                        <option value="X IPA 1">X IPA 1</option>
+                        <option value="X IPA 2">X IPA 2</option>
+                        <option value="XI IPS 1">XI IPS 1</option>
+                        <option value="XII IPA 1">XII IPA 1</option>
+                    </select>
+                </div>
+                <div class="pt-4 flex justify-end space-x-3">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Batal</button>
+                    <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-indigo-700 shadow-sm">Simpan Data</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3"></div>
+
+    <!-- Application Logic -->
+    <script>
+        // --- State Management ---
+        // Load data from localStorage or use default mock data
+        let students = JSON.parse(localStorage.getItem('absensi_students')) || [
+            { id: 1, nis: '1001', name: 'Ahmad Budi Santoso', class: 'XII IPA 1', status: null },
+            { id: 2, nis: '1002', name: 'Siti Aminah', class: 'XII IPA 1', status: null },
+            { id: 3, nis: '1003', name: 'Reza Rahadian', class: 'XI IPS 1', status: null },
+            { id: 4, nis: '1004', name: 'Putri Maharani', class: 'X IPA 1', status: null },
+        ];
+
+        let logs = JSON.parse(localStorage.getItem('absensi_logs')) || [];
+
+        // Save state to localStorage
+        function saveData() {
+            localStorage.setItem('absensi_students', JSON.stringify(students));
+            localStorage.setItem('absensi_logs', JSON.stringify(logs));
+        }
+
+        // --- Core Functions ---
+        
+        // Tab Navigation
+        function switchTab(tabId) {
+            // Hide all views
+            document.getElementById('view-dashboard').classList.add('hidden');
+            document.getElementById('view-siswa').classList.add('hidden');
+            document.getElementById('view-riwayat').classList.add('hidden');
+            
+            // Show target view
+            document.getElementById(`view-${tabId}`).classList.remove('hidden');
+
+            // Update Nav styling
+            document.querySelectorAll('nav a').forEach(el => {
+                el.classList.remove('nav-active');
+                el.classList.add('text-gray-600');
+            });
+            const activeNav = document.getElementById(`nav-${tabId}`);
+            activeNav.classList.add('nav-active');
+            activeNav.classList.remove('text-gray-600');
+
+            // Update Title
+            const titles = {
+                'dashboard': 'Dashboard',
+                'siswa': 'Manajemen Data Siswa',
+                'riwayat': 'Riwayat Absensi'
+            };
+            document.getElementById('page-title').innerText = titles[tabId];
+
+            // Re-render specific views just in case
+            if(tabId === 'dashboard') renderDashboard();
+            if(tabId === 'siswa') renderStudents();
+            if(tabId === 'riwayat') renderLogs();
+        }
+
+        // Clock & Date
+        function updateClock() {
+            const now = new Date();
+            
+            // Format Time
+            const timeString = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            document.getElementById('current-time').innerText = timeString;
+
+            // Format Date
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            const dateString = now.toLocaleDateString('id-ID', options);
+            document.getElementById('current-date').innerText = dateString;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // Render Dashboard Stats
+        function renderDashboard() {
+            const total = students.length;
+            const hadir = students.filter(s => s.status === 'Hadir').length;
+            const izinSakit = students.filter(s => s.status === 'Izin' || s.status === 'Sakit').length;
+            const alpa = students.filter(s => s.status === 'Alpa').length;
+
+            // Animate counting (simple direct assign for now, can add animation later)
+            document.getElementById('stat-total').innerText = total;
+            document.getElementById('stat-hadir').innerText = hadir;
+            document.getElementById('stat-izin').innerText = izinSakit;
+            document.getElementById('stat-alpa').innerText = alpa;
+
+            // Render 3 recent logs in dashboard
+            const recentLogsContainer = document.getElementById('dashboard-recent-logs');
+            recentLogsContainer.innerHTML = '';
+            
+            if (logs.length === 0) {
+                recentLogsContainer.innerHTML = '<li class="p-6 text-center text-gray-500 text-sm">Belum ada aktivitas absensi hari ini.</li>';
+            } else {
+                const recentLogs = logs.slice(0, 4); // top 4
+                recentLogs.forEach(log => {
+                    const statusColor = getStatusColor(log.status);
+                    const li = document.createElement('li');
+                    li.className = 'px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors';
+                    li.innerHTML = `
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 rounded-full ${statusColor.bg} ${statusColor.text} flex items-center justify-center mr-4">
+                                ${log.status.charAt(0)}
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-800">${log.studentName}</p>
+                                <p class="text-xs text-gray-500">${log.studentClass} • NIS: ${log.studentNis}</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColor.bg} ${statusColor.text}">
+                                ${log.status}
+                            </span>
+                            <p class="text-xs text-gray-400 mt-1">${log.time}</p>
+                        </div>
+                    `;
+                    recentLogsContainer.appendChild(li);
+                });
+            }
+        }
+
+        // Render Students Table
+        function renderStudents(searchQuery = '') {
+            const tbody = document.getElementById('student-table-body');
+            const emptyState = document.getElementById('empty-state-siswa');
+            tbody.innerHTML = '';
+
+            const filteredStudents = students.filter(s => 
+                s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                s.nis.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+
+            if (filteredStudents.length === 0) {
+                emptyState.classList.remove('hidden');
+                tbody.parentElement.classList.add('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                tbody.parentElement.classList.remove('hidden');
+
+                filteredStudents.forEach(student => {
+                    const statusBadge = student.status 
+                        ? `<span class="inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(student.status).bg} ${getStatusColor(student.status).text}">${student.status}</span>`
+                        : `<span class="inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Belum Absen</span>`;
+
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-gray-50 transition-colors group';
+                    tr.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${student.nis}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${student.name}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${student.class}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${statusBadge}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                            <div class="flex justify-end space-x-2">
+                                <button onclick="markAttendance(${student.id}, 'Hadir')" class="px-2 py-1 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded text-xs transition-colors border border-emerald-200" title="Hadir">H</button>
+                                <button onclick="markAttendance(${student.id}, 'Izin')" class="px-2 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded text-xs transition-colors border border-blue-200" title="Izin">I</button>
+                                <button onclick="markAttendance(${student.id}, 'Sakit')" class="px-2 py-1 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded text-xs transition-colors border border-amber-200" title="Sakit">S</button>
+                                <button onclick="markAttendance(${student.id}, 'Alpa')" class="px-2 py-1 bg-red-50 text-red-600 hover:bg-red-100 rounded text-xs transition-colors border border-red-200" title="Alpa">A</button>
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+
+        // Render History Logs
+        function renderLogs() {
+            const container = document.getElementById('full-history-logs');
+            const emptyState = document.getElementById('empty-state-riwayat');
+            container.innerHTML = '';
+
+            if (logs.length === 0) {
+                emptyState.classList.remove('hidden');
+                container.classList.add('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                container.classList.remove('hidden');
+
+                logs.forEach((log, index) => {
+                    const statusColor = getStatusColor(log.status);
+                    const div = document.createElement('div');
+                    div.className = 'relative pl-8';
+                    div.innerHTML = `
+                        <div class="absolute -left-[5px] top-1.5 w-3 h-3 rounded-full ${statusColor.bg} border-2 border-white shadow"></div>
+                        <div class="bg-gray-50 rounded-lg p-4 flex justify-between items-center border border-gray-100 hover:shadow-sm transition-shadow">
+                            <div>
+                                <p class="text-sm font-medium text-gray-900">${log.studentName}</p>
+                                <p class="text-xs text-gray-500 mt-0.5">Telah ditandai sebagai <span class="font-semibold ${statusColor.text}">${log.status}</span></p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-xs font-medium text-gray-600">${log.time}</p>
+                                <p class="text-[10px] text-gray-400 mt-0.5">${log.date}</p>
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(div);
+                });
+            }
+        }
+
+        // Action: Mark Attendance
+        function markAttendance(studentId, status) {
+            const studentIndex = students.findIndex(s => s.id === studentId);
+            if (studentIndex > -1) {
+                const student = students[studentIndex];
+                student.status = status;
+
+                // Create log entry
+                const now = new Date();
+                const log = {
+                    id: Date.now(),
+                    studentId: student.id,
+                    studentName: student.name,
+                    studentNis: student.nis,
+                    studentClass: student.class,
+                    status: status,
+                    time: now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+                    date: now.toLocaleDateString('id-ID')
+                };
+
+                // Add to beginning of array
+                logs.unshift(log);
+
+                // Save & Re-render
+                saveData();
+                renderDashboard();
+                renderStudents(document.getElementById('search-siswa').value);
+                renderLogs();
+
+                // Show Toast
+                showToast(`${student.name} ditandai ${status}`, 'success');
+            }
+        }
+
+        // Helper: Get color based on status
+        function getStatusColor(status) {
+            switch(status) {
+                case 'Hadir': return { bg: 'bg-emerald-100', text: 'text-emerald-700' };
+                case 'Izin': return { bg: 'bg-blue-100', text: 'text-blue-700' };
+                case 'Sakit': return { bg: 'bg-amber-100', text: 'text-amber-700' };
+                case 'Alpa': return { bg: 'bg-red-100', text: 'text-red-700' };
+                default: return { bg: 'bg-gray-100', text: 'text-gray-700' };
+            }
+        }
+
+        // --- Modal Logic ---
+        const modal = document.getElementById('modal-add-student');
+        const modalContent = document.getElementById('modal-content');
+
+        function openModal() {
+            modal.classList.remove('hidden');
+            // Small delay to allow display:block to apply before transition
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modalContent.classList.remove('scale-95');
+            }, 10);
+            document.getElementById('input-nis').focus();
+        }
+
+        function closeModal() {
+            modal.classList.add('opacity-0');
+            modalContent.classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                document.getElementById('form-add-student').reset();
+            }, 300);
+        }
+
+        // Action: Handle Form Submit (Add Student)
+        function handleAddStudent(e) {
+            e.preventDefault();
+            
+            const nis = document.getElementById('input-nis').value;
+            const name = document.getElementById('input-nama').value;
+            const className = document.getElementById('input-kelas').value;
+
+            // Simple validation
+            if (!nis || !name || !className) {
+                showToast('Semua field harus diisi!', 'error');
+                return;
+            }
+
+            const newStudent = {
+                id: Date.now(),
+                nis: nis,
+                name: name,
+                class: className,
+                status: null
+            };
+
+            students.push(newStudent);
+            saveData();
+            
+            renderDashboard();
+            renderStudents();
+            closeModal();
+            showToast('Siswa berhasil ditambahkan!', 'success');
+        }
+
+        // Action: Clear Logs
+        function clearLogs() {
+            if(confirm('Apakah Anda yakin ingin menghapus semua riwayat absensi?')) {
+                logs = [];
+                // Reset student status
+                students.forEach(s => s.status = null);
+                saveData();
+                renderDashboard();
+                renderStudents();
+                renderLogs();
+                showToast('Riwayat berhasil dihapus', 'success');
+            }
+        }
+
+        // Toast Notification System
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const bgColor = type === 'success' ? 'bg-gray-800' : 'bg-red-600';
+            const icon = type === 'success' ? 'check-circle' : 'alert-circle';
+            const iconColor = type === 'success' ? 'text-emerald-400' : 'text-white';
+
+            toast.className = `flex items-center w-full max-w-xs p-4 text-white ${bgColor} rounded-lg shadow-lg toast-enter-active`;
+            toast.innerHTML = `
+                <div class="inline-flex items-center justify-center flex-shrink-0 w-8 h-8 rounded-lg bg-white/10">
+                    <i data-lucide="${icon}" class="w-5 h-5 ${iconColor}"></i>
+                </div>
+                <div class="ml-3 text-sm font-normal">${message}</div>
+            `;
+            
+            container.appendChild(toast);
+            lucide.createIcons(); // Re-initialize icon for toast
+
+            // Remove toast after 3 seconds
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    toast.remove();
+                }, 300);
+            }, 3000);
+        }
+
+        // Search Listener
+        document.getElementById('search-siswa').addEventListener('input', (e) => {
+            renderStudents(e.target.value);
+        });
+
+        // Initialize App
+        function init() {
+            lucide.createIcons();
+            renderDashboard();
+            renderStudents();
+            renderLogs();
+        }
+
+        // Run on load
+        window.onload = init;
+
+    </script>
+</body>
+</html>
