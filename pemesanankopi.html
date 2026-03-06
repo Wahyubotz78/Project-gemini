@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kopi Senja - Sistem Pemesanan & Antrian</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Poppins', sans-serif; background-color: #f8f5f2; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #8b5a2b; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b4423; }
+
+        /* Animations */
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+        .toast-enter { animation: slideInRight 0.3s ease-out forwards; }
+        .toast-exit { animation: fadeOut 0.3s ease-out forwards; }
+        
+        .modal-enter { animation: fadeIn 0.2s ease-out forwards; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        /* Thematic colors */
+        .text-coffee { color: #4A3018; }
+        .bg-coffee { background-color: #4A3018; }
+        .hover-bg-coffee:hover { background-color: #382412; }
+        .text-coffee-light { color: #8B5A2B; }
+        .bg-coffee-light { background-color: #8B5A2B; }
+
+        /* Print Styles */
+        @media print {
+            body * { visibility: hidden; }
+            #receipt-panel, #receipt-panel * { visibility: visible; }
+            #receipt-panel { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 20px; box-shadow: none; border: none; border-radius: 0; }
+            .no-print { display: none !important; }
+        }
+
+        /* Chat Panel Animations */
+        .chat-open { transform: scale(1); opacity: 1; }
+        .chat-close { transform: scale(0); opacity: 0; }
+    </style>
+</head>
+<body class="text-gray-800 h-screen flex flex-col overflow-hidden">
+
+    <!-- Navbar -->
+    <nav class="bg-coffee text-white shadow-md z-10 relative">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-mug-hot text-2xl text-amber-300"></i>
+                    <span class="font-bold text-xl tracking-wider">Kopi Senja</span>
+                </div>
+                
+                <div class="flex items-center gap-4">
+                    <!-- Toggle View Buttons -->
+                    <div class="bg-black/20 p-1 rounded-lg flex text-sm font-medium">
+                        <button onclick="switchView('customer')" id="btn-view-customer" class="px-3 py-1.5 rounded bg-white text-coffee transition-all">
+                            <i class="fa-solid fa-user mr-1"></i> Pelanggan
+                        </button>
+                        <button onclick="switchView('admin')" id="btn-view-admin" class="px-3 py-1.5 rounded text-white hover:bg-white/10 transition-all">
+                            <i class="fa-solid fa-user-shield mr-1"></i> Admin
+                        </button>
+                    </div>
+
+                    <!-- Cart Button (Only in Customer View) -->
+                    <button onclick="toggleCart()" id="btn-cart-nav" class="relative p-2 text-white hover:text-amber-300 transition-colors">
+                        <i class="fa-solid fa-shopping-cart text-xl"></i>
+                        <span id="cart-badge" class="absolute top-0 right-0 -mt-1 -mr-1 bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full hidden">0</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Area (Scrollable) -->
+    <main class="flex-1 overflow-y-auto relative">
+        
+        <!-- ================= CUSTOMER VIEW ================= -->
+        <div id="customer-view" class="block pb-24">
+            
+            <!-- Hero Section -->
+            <div class="bg-coffee-light text-white py-12 px-4 text-center">
+                <h1 class="text-3xl md:text-4xl font-bold mb-2">Pesan Kopi Favoritmu Tanpa Antri Lama!</h1>
+                <p class="text-amber-100 max-w-2xl mx-auto">Pilih menu, pesan, dapatkan nomor antrian, dan ambil saat pesananmu sudah siap.</p>
+            </div>
+
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                
+                <!-- Status Pesanan Pelanggan (Muncul jika ada pesanan) -->
+                <div id="customer-orders-section" class="mb-10 hidden">
+                    <h2 class="text-2xl font-bold text-coffee border-b-2 border-amber-200 pb-2 mb-4">
+                        <i class="fa-solid fa-ticket-alt mr-2"></i> Pesanan Aktif Saya
+                    </h2>
+                    <div id="customer-orders-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <!-- Order cards will be injected here -->
+                    </div>
+                </div>
+
+                <!-- Menu Kopi -->
+                <h2 class="text-2xl font-bold text-coffee border-b-2 border-amber-200 pb-2 mb-6">
+                    <i class="fa-solid fa-book-open mr-2"></i> Menu Kami
+                </h2>
+                
+                <div id="menu-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                    <!-- Menu items will be injected here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= ADMIN VIEW ================= -->
+        <div id="admin-view" class="hidden bg-gray-100 min-h-full pb-10">
+            <div class="bg-white shadow-sm mb-6">
+                <div class="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex justify-between items-center">
+                    <h1 class="text-2xl font-bold text-gray-800"><i class="fa-solid fa-cash-register mr-2 text-coffee"></i> Dasbor Pesanan (Admin)</h1>
+                    <div class="text-sm bg-amber-100 text-amber-800 px-3 py-1 rounded-full font-semibold">
+                        <i class="fa-solid fa-bell mr-1"></i> <span id="admin-pending-count">0</span> Pesanan Baru
+                    </div>
+                </div>
+            </div>
+
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <!-- Ringkasan Keuangan (Modal, Untung, Rugi) -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xl"><i class="fa-solid fa-wallet"></i></div>
+                        <div>
+                            <p class="text-sm text-gray-500 font-medium">Total Modal</p>
+                            <p id="admin-total-modal" class="text-xl font-bold text-gray-800">Rp 0</p>
+                        </div>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-green-600 text-xl"><i class="fa-solid fa-arrow-trend-up"></i></div>
+                        <div>
+                            <p class="text-sm text-gray-500 font-medium">Total Untung</p>
+                            <p id="admin-total-untung" class="text-xl font-bold text-green-600">Rp 0</p>
+                        </div>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center text-red-600 text-xl"><i class="fa-solid fa-arrow-trend-down"></i></div>
+                        <div>
+                            <p class="text-sm text-gray-500 font-medium">Total Rugi</p>
+                            <p id="admin-total-rugi" class="text-xl font-bold text-red-600">Rp 0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Kanban/Grid Board for Orders -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    
+                    <!-- Kolom: Menunggu Konfirmasi -->
+                    <div class="bg-gray-50 rounded-xl p-4 border border-gray-200 shadow-sm flex flex-col h-[70vh]">
+                        <h3 class="font-bold text-gray-700 mb-3 flex items-center justify-between pb-2 border-b">
+                            <span><i class="fa-solid fa-clock text-amber-500 mr-2"></i> Menunggu</span>
+                            <span id="count-pending" class="bg-amber-500 text-white text-xs px-2 py-1 rounded-full">0</span>
+                        </h3>
+                        <div id="admin-col-pending" class="flex-1 overflow-y-auto space-y-3 pr-1"></div>
+                    </div>
+
+                    <!-- Kolom: Sedang Dibuat -->
+                    <div class="bg-blue-50 rounded-xl p-4 border border-blue-100 shadow-sm flex flex-col h-[70vh]">
+                        <h3 class="font-bold text-blue-800 mb-3 flex items-center justify-between pb-2 border-b border-blue-200">
+                            <span><i class="fa-solid fa-blender text-blue-500 mr-2"></i> Sedang Dibuat</span>
+                            <span id="count-preparing" class="bg-blue-500 text-white text-xs px-2 py-1 rounded-full">0</span>
+                        </h3>
+                        <div id="admin-col-preparing" class="flex-1 overflow-y-auto space-y-3 pr-1"></div>
+                    </div>
+
+                    <!-- Kolom: Siap Diambil -->
+                    <div class="bg-green-50 rounded-xl p-4 border border-green-100 shadow-sm flex flex-col h-[70vh]">
+                        <h3 class="font-bold text-green-800 mb-3 flex items-center justify-between pb-2 border-b border-green-200">
+                            <span><i class="fa-solid fa-check-circle text-green-500 mr-2"></i> Siap Diambil</span>
+                            <span id="count-ready" class="bg-green-500 text-white text-xs px-2 py-1 rounded-full">0</span>
+                        </h3>
+                        <div id="admin-col-ready" class="flex-1 overflow-y-auto space-y-3 pr-1"></div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- ================= MODALS & OVERLAYS ================= -->
+
+    <!-- Cart Sidebar/Modal -->
+    <div id="cart-modal" class="fixed inset-0 z-50 hidden">
+        <!-- Backdrop -->
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity" onclick="toggleCart()"></div>
+        
+        <!-- Cart Panel -->
+        <div class="absolute inset-y-0 right-0 max-w-md w-full bg-white shadow-2xl flex flex-col transform transition-transform duration-300 translate-x-full" id="cart-panel">
+            
+            <div class="p-4 border-b flex justify-between items-center bg-gray-50">
+                <h2 class="text-xl font-bold text-coffee"><i class="fa-solid fa-shopping-cart mr-2"></i> Keranjang Pesanan</h2>
+                <button onclick="toggleCart()" class="text-gray-500 hover:text-red-500 text-xl"><i class="fa-solid fa-times"></i></button>
+            </div>
+
+            <!-- Cart Items -->
+            <div id="cart-items-container" class="flex-1 overflow-y-auto p-4 space-y-4">
+                <!-- Cart items injected here -->
+                <div class="text-center text-gray-400 mt-10" id="empty-cart-msg">
+                    <i class="fa-solid fa-basket-shopping text-4xl mb-3"></i>
+                    <p>Keranjangmu masih kosong</p>
+                </div>
+            </div>
+
+            <!-- Checkout Section -->
+            <div class="border-t p-4 bg-gray-50">
+                <div class="flex justify-between items-center mb-4 text-lg font-bold">
+                    <span>Total Bayar:</span>
+                    <span id="cart-total" class="text-coffee">Rp 0</span>
+                </div>
+                
+                <div id="checkout-form" class="hidden space-y-3 mb-4 transition-all">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Nama Pemesan</label>
+                        <input type="text" id="customer-name" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-coffee focus:ring-coffee p-2 border" placeholder="Masukkan nama Anda">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Tipe Pesanan</label>
+                        <select id="order-type" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-coffee focus:ring-coffee p-2 border">
+                            <option value="Dine In">Dine In (Makan di tempat)</option>
+                            <option value="Takeaway">Takeaway (Bawa pulang)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button id="btn-checkout" onclick="handleCheckout()" class="w-full bg-coffee hover-bg-coffee text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-colors flex justify-center items-center gap-2 opacity-50 cursor-not-allowed" disabled>
+                    Lanjut Pembayaran <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Receipt Modal -->
+    <div id="receipt-modal" class="fixed inset-0 z-[60] hidden flex items-center justify-center">
+        <!-- Backdrop -->
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm no-print" onclick="closeReceipt()"></div>
+        
+        <!-- Receipt Card -->
+        <div id="receipt-panel" class="bg-white rounded-2xl shadow-2xl w-full max-w-sm m-4 relative z-10 overflow-hidden flex flex-col modal-enter">
+            <!-- Receipt Header -->
+            <div class="text-center pt-8 pb-4 border-b border-dashed border-gray-300 bg-white">
+                <i class="fa-solid fa-mug-hot text-4xl text-coffee mb-2"></i>
+                <h2 class="font-bold text-2xl tracking-wider text-gray-800">KOPI SENJA</h2>
+                <p class="text-xs text-gray-500">Jl. Kenangan No. 99, Jakarta</p>
+                
+                <div class="mt-6 mb-2">
+                    <p class="text-xs text-gray-500 uppercase tracking-widest font-semibold">Nomor Antrian</p>
+                    <p id="receipt-queue" class="text-5xl font-black text-coffee my-2"></p>
+                    <p id="receipt-customer" class="text-sm font-semibold text-gray-700"></p>
+                </div>
+            </div>
+            
+            <!-- Receipt Body -->
+            <div class="p-6 bg-gray-50 flex-1">
+                <div class="flex justify-between text-xs text-gray-500 mb-4 pb-2 border-b border-gray-200">
+                    <span id="receipt-date"></span>
+                    <span id="receipt-type" class="font-bold"></span>
+                </div>
+                
+                <div id="receipt-items" class="space-y-3 mb-4">
+                    <!-- Items injected here -->
+                </div>
+                
+                <div class="border-t border-dashed border-gray-300 pt-4 flex justify-between items-center font-bold text-lg text-gray-800">
+                    <span>Total</span>
+                    <span id="receipt-total" class="text-coffee"></span>
+                </div>
+            </div>
+            
+            <!-- Receipt Footer & Actions (Hidden on Print) -->
+            <div class="p-4 bg-white border-t flex gap-3 no-print">
+                <button onclick="printReceipt()" class="flex-1 border-2 border-coffee text-coffee hover:bg-amber-50 font-bold py-2.5 rounded-xl transition-colors">
+                    <i class="fa-solid fa-print mr-1"></i> Cetak
+                </button>
+                <button onclick="closeReceipt()" class="flex-1 bg-coffee hover-bg-coffee text-white font-bold py-2.5 rounded-xl transition-colors">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Floating Button & Panel -->
+    <div class="no-print">
+        <!-- FAB -->
+        <button onclick="toggleChat()" class="fixed bottom-6 right-6 bg-amber-500 hover:bg-amber-600 text-white rounded-full w-14 h-14 shadow-2xl flex items-center justify-center text-2xl z-[55] transition-transform hover:scale-105">
+            <i class="fa-solid fa-comments"></i>
+            <span id="chat-badge" class="absolute top-0 right-0 -mt-1 -mr-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center hidden border-2 border-white">0</span>
+        </button>
+
+        <!-- Chat Panel -->
+        <div id="chat-panel" class="fixed bottom-24 right-6 w-80 h-[400px] bg-white rounded-2xl shadow-2xl z-[55] flex flex-col hidden overflow-hidden border border-gray-200 origin-bottom-right transition-all duration-300 chat-close">
+            <!-- Header -->
+            <div class="bg-amber-500 p-4 text-white flex justify-between items-center shadow-sm z-10">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-headset text-xl"></i>
+                    <h3 id="chat-title" class="font-bold text-sm">Bantuan Pelanggan</h3>
+                </div>
+                <button onclick="toggleChat()" class="text-white hover:text-amber-100 transition-colors"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <!-- Messages -->
+            <div id="chat-messages" class="flex-1 p-4 overflow-y-auto bg-[#f8f5f2] flex flex-col gap-3">
+                <!-- Injected messages -->
+            </div>
+            <!-- Input -->
+            <div class="p-3 bg-white border-t flex gap-2 items-center">
+                <input type="text" id="chat-input" onkeypress="handleChatKeyPress(event)" class="flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500" placeholder="Ketik pesan...">
+                <button onclick="sendMessage()" class="bg-amber-500 hover:bg-amber-600 text-white w-10 h-10 rounded-full flex items-center justify-center transition-colors shrink-0">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-20 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- ================= JAVASCRIPT LOGIC ================= -->
+    <script>
+        // --- 1. DATA & STATE ---
+        const menuItems = [
+            { id: 1, name: "Kopi Susu Gula Aren", price: 22000, cost: 12000, category: "Signature", img: "☕", desc: "Espresso, susu segar, dan gula aren asli." },
+            { id: 2, name: "Americano", price: 18000, cost: 8000, category: "Classic", img: "🍵", desc: "Espresso pekat dengan air murni, panas/dingin." },
+            { id: 3, name: "Caramel Macchiato", price: 28000, cost: 15000, category: "Espresso Base", img: "🧋", desc: "Susu vanilla, espresso, dengan siraman karamel." },
+            { id: 4, name: "Matcha Latte", price: 25000, cost: 14000, category: "Non-Coffee", img: "🍵", desc: "Bubuk matcha premium dengan susu segar." },
+            { id: 5, name: "Cafe Latte", price: 24000, cost: 12000, category: "Classic", img: "☕", desc: "Espresso dengan rasio susu steamed yang lebih banyak." },
+            { id: 6, name: "Red Velvet Latte", price: 26000, cost: 15000, category: "Non-Coffee", img: "🥤", desc: "Rasa kue red velvet yang manis dan creamy." },
+            { id: 7, name: "Mochaccino", price: 26000, cost: 14000, category: "Espresso Base", img: "🍫", desc: "Paduan harmonis espresso, susu, dan cokelat." },
+            { id: 8, name: "Lychee Tea", price: 20000, cost: 10000, category: "Refreshment", img: "🍹", desc: "Teh melati dengan sirup leci dan buah leci asli." }
+        ];
+
+        let cart = [];
+        let orders = []; // Struktur: { id, queueNumber, customerName, type, items, total, status, timestamp }
+        let queueCounter = 1;
+        let currentView = 'customer'; // 'customer' | 'admin'
+        let currentUserId = "USER_" + Math.random().toString(36).substr(2, 9); // Simulasi ID User unik per tab
+
+        // Chat State
+        let chatMessages = [
+            { id: 1, sender: 'admin', text: 'Halo! Ada yang bisa kami bantu?', timestamp: new Date().toISOString() }
+        ];
+        let isChatOpen = false;
+        let unreadCount = { customer: 1, admin: 0 }; // Default 1 pesan belum dibaca untuk pelanggan
+
+        // Format Uang Rupiah
+        const formatRp = (angka) => {
+            return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
+        };
+
+        // Format Tanggal/Waktu
+        const formatTime = (dateStr) => {
+            const d = new Date(dateStr);
+            return d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        };
+
+        // --- 2. CUSTOMER UI FUNCTIONS ---
+
+        function renderMenu() {
+            const container = document.getElementById('menu-container');
+            container.innerHTML = menuItems.map(item => `
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow group">
+                    <div class="h-40 bg-gray-50 flex items-center justify-center text-6xl group-hover:scale-110 transition-transform duration-300">
+                        ${item.img}
+                    </div>
+                    <div class="p-4">
+                        <span class="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-1 rounded-full">${item.category}</span>
+                        <h3 class="font-bold text-gray-800 mt-2 text-lg">${item.name}</h3>
+                        <p class="text-sm text-gray-500 mt-1 line-clamp-2 min-h-[40px]">${item.desc}</p>
+                        <div class="mt-4 flex items-center justify-between">
+                            <span class="font-bold text-coffee">${formatRp(item.price)}</span>
+                            <button onclick="addToCart(${item.id})" class="bg-coffee hover-bg-coffee text-white w-8 h-8 rounded-full flex items-center justify-center shadow-sm transition-colors" title="Tambah ke keranjang">
+                                <i class="fa-solid fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function addToCart(itemId) {
+            const item = menuItems.find(i => i.id === itemId);
+            const existing = cart.find(i => i.id === itemId);
+            
+            if (existing) {
+                existing.qty += 1;
+            } else {
+                cart.push({ ...item, qty: 1 });
+            }
+            
+            updateCartUI();
+            showToast(`${item.name} ditambahkan ke keranjang`, 'success');
+        }
+
+        function removeFromCart(itemId) {
+            cart = cart.filter(i => i.id !== itemId);
+            updateCartUI();
+        }
+
+        function updateItemQty(itemId, delta) {
+            const item = cart.find(i => i.id === itemId);
+            if (item) {
+                item.qty += delta;
+                if (item.qty <= 0) removeFromCart(itemId);
+                else updateCartUI();
+            }
+        }
+
+        function updateCartUI() {
+            // Update Badges
+            const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
+            const badge = document.getElementById('cart-badge');
+            if (totalQty > 0) {
+                badge.textContent = totalQty;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+
+            // Update Items List
+            const container = document.getElementById('cart-items-container');
+            const form = document.getElementById('checkout-form');
+            const btnCheckout = document.getElementById('btn-checkout');
+
+            if (cart.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-gray-400 mt-10" id="empty-cart-msg">
+                        <i class="fa-solid fa-basket-shopping text-4xl mb-3"></i>
+                        <p>Keranjangmu masih kosong</p>
+                    </div>
+                `;
+                form.classList.add('hidden');
+                btnCheckout.disabled = true;
+                btnCheckout.classList.add('opacity-50', 'cursor-not-allowed');
+                btnCheckout.innerHTML = `Lanjut Pembayaran <i class="fa-solid fa-arrow-right"></i>`;
+                document.getElementById('cart-total').textContent = formatRp(0);
+                return;
+            }
+
+            container.innerHTML = cart.map(item => `
+                <div class="flex items-center justify-between bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center text-xl">${item.img}</div>
+                        <div>
+                            <h4 class="font-semibold text-sm text-gray-800">${item.name}</h4>
+                            <div class="text-coffee text-sm font-medium">${formatRp(item.price)}</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 bg-gray-50 rounded-lg border px-2 py-1">
+                        <button onclick="updateItemQty(${item.id}, -1)" class="text-gray-500 hover:text-coffee"><i class="fa-solid fa-minus text-xs"></i></button>
+                        <span class="w-4 text-center text-sm font-semibold">${item.qty}</span>
+                        <button onclick="updateItemQty(${item.id}, 1)" class="text-gray-500 hover:text-coffee"><i class="fa-solid fa-plus text-xs"></i></button>
+                    </div>
+                </div>
+            `).join('');
+
+            // Update Total
+            const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            document.getElementById('cart-total').textContent = formatRp(total);
+
+            // Show form & enable button
+            form.classList.remove('hidden');
+            btnCheckout.disabled = false;
+            btnCheckout.classList.remove('opacity-50', 'cursor-not-allowed');
+            btnCheckout.innerHTML = `Pesan Sekarang - ${formatRp(total)}`;
+        }
+
+        function toggleCart() {
+            const modal = document.getElementById('cart-modal');
+            const panel = document.getElementById('cart-panel');
+            
+            if (modal.classList.contains('hidden')) {
+                // Open
+                modal.classList.remove('hidden');
+                setTimeout(() => panel.classList.remove('translate-x-full'), 10);
+            } else {
+                // Close
+                panel.classList.add('translate-x-full');
+                setTimeout(() => modal.classList.add('hidden'), 300);
+            }
+        }
+
+        function handleCheckout() {
+            const nameInput = document.getElementById('customer-name').value.trim();
+            const typeInput = document.getElementById('order-type').value;
+
+            if (!nameInput) {
+                showToast('Mohon masukkan nama pemesan', 'error');
+                document.getElementById('customer-name').focus();
+                return;
+            }
+
+            if (cart.length === 0) return;
+
+            // Generate Order
+            const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            const queueNum = `A-${queueCounter.toString().padStart(3, '0')}`;
+            queueCounter++;
+
+            const newOrder = {
+                id: "ORD_" + Date.now(),
+                userId: currentUserId, // Untuk filter agar user hanya melihat pesanannya sendiri
+                queueNumber: queueNum,
+                customerName: nameInput,
+                type: typeInput,
+                items: [...cart], // copy array
+                total: total,
+                status: 'pending', // pending, preparing, ready, completed
+                timestamp: new Date().toISOString()
+            };
+
+            orders.push(newOrder);
+            
+            // Tampilkan Struk
+            showReceipt(newOrder);
+
+            // Reset Cart
+            cart = [];
+            document.getElementById('customer-name').value = '';
+            updateCartUI();
+            toggleCart();
+
+            // Notify & Update UI
+            showToast(`Pesanan berhasil dibuat! Antrian: ${queueNum}`, 'success');
+            renderCustomerOrders();
+            renderAdminOrders(); // Update background admin view
+            
+            // Scroll ke atas agar user lihat pesanan aktif
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function renderCustomerOrders() {
+            const section = document.getElementById('customer-orders-section');
+            const container = document.getElementById('customer-orders-container');
+            
+            // Filter hanya pesanan user ini yang belum 'completed'
+            const activeOrders = orders.filter(o => o.userId === currentUserId && o.status !== 'completed');
+
+            if (activeOrders.length === 0) {
+                section.classList.add('hidden');
+                return;
+            }
+
+            section.classList.remove('hidden');
+            container.innerHTML = activeOrders.map(order => {
+                
+                let statusBadge, statusIcon, statusBg, pulseClass = "";
+                
+                switch(order.status) {
+                    case 'pending':
+                        statusBadge = 'Menunggu Konfirmasi';
+                        statusIcon = 'fa-clock';
+                        statusBg = 'bg-amber-100 text-amber-800 border-amber-200';
+                        break;
+                    case 'preparing':
+                        statusBadge = 'Sedang Dibuat';
+                        statusIcon = 'fa-blender';
+                        statusBg = 'bg-blue-100 text-blue-800 border-blue-200';
+                        pulseClass = "animate-pulse";
+                        break;
+                    case 'ready':
+                        statusBadge = 'SIAP DIAMBIL';
+                        statusIcon = 'fa-bell';
+                        statusBg = 'bg-green-500 text-white border-green-600 shadow-lg shadow-green-200';
+                        pulseClass = "animate-bounce";
+                        break;
+                }
+
+                // Hitung total item
+                const totalItems = order.items.reduce((sum, item) => sum + item.qty, 0);
+                const itemsList = order.items.map(i => `${i.qty}x ${i.name}`).join(', ');
+
+                return `
+                    <div class="bg-white rounded-2xl shadow border border-gray-100 overflow-hidden flex flex-col">
+                        <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
+                            <div>
+                                <p class="text-xs text-gray-500 uppercase tracking-wider font-semibold">Nomor Antrian</p>
+                                <p class="text-3xl font-black text-coffee">${order.queueNumber}</p>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-xs text-gray-500">${order.type}</span>
+                                <p class="font-bold text-gray-800">${formatRp(order.total)}</p>
+                            </div>
+                        </div>
+                        <div class="p-4 flex-1">
+                            <p class="text-sm font-semibold text-gray-800 mb-1">Hai, ${order.customerName}!</p>
+                            <p class="text-xs text-gray-500 mb-4 line-clamp-2" title="${itemsList}">${totalItems} Item: ${itemsList}</p>
+                            
+                            <div class="mt-auto px-3 py-2 rounded-lg border flex items-center justify-center gap-2 font-bold text-sm ${statusBg} ${pulseClass}">
+                                <i class="fa-solid ${statusIcon}"></i> ${statusBadge}
+                            </div>
+                        </div>
+                        ${order.status === 'ready' ? `
+                            <button onclick="takeOrder('${order.id}')" class="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold text-sm transition-colors">
+                                <i class="fa-solid fa-check mr-1"></i> Saya Sudah Ambil
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function takeOrder(orderId) {
+            updateOrderStatus(orderId, 'completed');
+            showToast('Pesanan selesai. Terima kasih!', 'success');
+        }
+
+        // --- 3. ADMIN UI FUNCTIONS ---
+
+        function renderAdminOrders() {
+            const colPending = document.getElementById('admin-col-pending');
+            const colPreparing = document.getElementById('admin-col-preparing');
+            const colReady = document.getElementById('admin-col-ready');
+
+            // Reset
+            colPending.innerHTML = '';
+            colPreparing.innerHTML = '';
+            colReady.innerHTML = '';
+
+            let countP = 0, countPrep = 0, countR = 0;
+
+            orders.forEach(order => {
+                if (order.status === 'completed') return;
+
+                const itemsHTML = order.items.map(i => `<div class="text-xs text-gray-600 flex justify-between"><span>${i.qty}x ${i.name}</span></div>`).join('');
+                
+                const cardHTML = `
+                    <div class="bg-white p-3 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                        <div class="flex justify-between items-start mb-2 border-b pb-2">
+                            <div>
+                                <span class="font-bold text-lg text-gray-800">${order.queueNumber}</span>
+                                <span class="text-[10px] bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded ml-1">${order.type}</span>
+                            </div>
+                            <span class="text-xs text-gray-400">${formatTime(order.timestamp)}</span>
+                        </div>
+                        <p class="text-sm font-semibold text-gray-800 mb-2"><i class="fa-regular fa-user text-gray-400 mr-1"></i> ${order.customerName}</p>
+                        <div class="mb-3 space-y-1 bg-gray-50 p-2 rounded">
+                            ${itemsHTML}
+                        </div>
+                        
+                        <!-- Action Buttons based on status -->
+                        ${order.status === 'pending' ? `
+                            <button onclick="updateOrderStatus('${order.id}', 'preparing')" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 rounded shadow-sm transition-colors">
+                                <i class="fa-solid fa-play mr-1"></i> Mulai Buat
+                            </button>
+                        ` : ''}
+
+                        ${order.status === 'preparing' ? `
+                            <button onclick="updateOrderStatus('${order.id}', 'ready')" class="w-full bg-green-500 hover:bg-green-600 text-white text-xs font-bold py-2 rounded shadow-sm transition-colors">
+                                <i class="fa-solid fa-bell mr-1"></i> Tandai Siap Diambil
+                            </button>
+                        ` : ''}
+                        
+                        ${order.status === 'ready' ? `
+                            <button onclick="updateOrderStatus('${order.id}', 'completed')" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-bold py-2 rounded transition-colors mt-2">
+                                <i class="fa-solid fa-check-double mr-1"></i> Selesaikan Manual
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+
+                if (order.status === 'pending') { colPending.innerHTML += cardHTML; countP++; }
+                else if (order.status === 'preparing') { colPreparing.innerHTML += cardHTML; countPrep++; }
+                else if (order.status === 'ready') { colReady.innerHTML += cardHTML; countR++; }
+            });
+
+            // Update Counters
+            document.getElementById('count-pending').textContent = countP;
+            document.getElementById('count-preparing').textContent = countPrep;
+            document.getElementById('count-ready').textContent = countR;
+            document.getElementById('admin-pending-count').textContent = countP;
+
+            // Empty states
+            if (countP === 0) colPending.innerHTML = `<div class="text-center text-gray-400 text-sm mt-10"><i class="fa-solid fa-mug-hot mb-2 text-2xl"></i><br>Tidak ada pesanan</div>`;
+            if (countPrep === 0) colPreparing.innerHTML = `<div class="text-center text-gray-400 text-sm mt-10"><i class="fa-solid fa-mug-hot mb-2 text-2xl"></i><br>Kosong</div>`;
+            if (countR === 0) colReady.innerHTML = `<div class="text-center text-gray-400 text-sm mt-10"><i class="fa-solid fa-mug-hot mb-2 text-2xl"></i><br>Kosong</div>`;
+            
+            // Hitung dan tampilkan ringkasan keuangan
+            renderFinancials();
+        }
+
+        function renderFinancials() {
+            let totalModal = 0;
+            let totalPendapatan = 0;
+
+            orders.forEach(order => {
+                order.items.forEach(orderItem => {
+                    // Cari item asli untuk mendapatkan harga modal (cost)
+                    const menuItem = menuItems.find(m => m.id === orderItem.id);
+                    if (menuItem) {
+                        totalModal += (menuItem.cost * orderItem.qty);
+                    }
+                });
+                totalPendapatan += order.total; // total harga jual pesanan
+            });
+
+            const untung = totalPendapatan - totalModal;
+            
+            let displayUntung = 0;
+            let displayRugi = 0;
+            
+            if (untung > 0) {
+                displayUntung = untung;
+            } else if (untung < 0) {
+                // Tampilkan rugi sebagai nilai absolut di UI
+                displayRugi = Math.abs(untung);
+            }
+
+            document.getElementById('admin-total-modal').textContent = formatRp(totalModal);
+            document.getElementById('admin-total-untung').textContent = formatRp(displayUntung);
+            document.getElementById('admin-total-rugi').textContent = formatRp(displayRugi);
+        }
+
+        function updateOrderStatus(orderId, newStatus) {
+            const order = orders.find(o => o.id === orderId);
+            if (order) {
+                order.status = newStatus;
+                
+                // Re-render both views to keep them in sync
+                renderAdminOrders();
+                renderCustomerOrders();
+
+                // Notifikasi Admin
+                if (currentView === 'admin') {
+                    const statusText = newStatus === 'preparing' ? 'Sedang dibuat' : newStatus === 'ready' ? 'Siap diambil' : 'Selesai';
+                    showToast(`Pesanan ${order.queueNumber} diperbarui: ${statusText}`, 'info');
+                }
+            }
+        }
+
+        // --- 4. FUNGSI STRUK ANTRIAN (RECEIPT) ---
+
+        function showReceipt(order) {
+            document.getElementById('receipt-queue').textContent = order.queueNumber;
+            document.getElementById('receipt-customer').textContent = order.customerName;
+            document.getElementById('receipt-date').textContent = formatTime(order.timestamp);
+            document.getElementById('receipt-type').textContent = order.type;
+            
+            const itemsHTML = order.items.map(item => `
+                <div class="flex justify-between text-sm">
+                    <div class="flex-1">
+                        <span class="font-semibold text-gray-800">${item.qty}x</span> ${item.name}
+                    </div>
+                    <div class="text-gray-700 font-medium">
+                        ${formatRp(item.price * item.qty)}
+                    </div>
+                </div>
+            `).join('');
+            
+            document.getElementById('receipt-items').innerHTML = itemsHTML;
+            document.getElementById('receipt-total').textContent = formatRp(order.total);
+            
+            // Tampilkan Modal
+            document.getElementById('receipt-modal').classList.remove('hidden');
+        }
+
+        function closeReceipt() {
+            document.getElementById('receipt-modal').classList.add('hidden');
+        }
+
+        function printReceipt() {
+            window.print();
+        }
+
+        // --- 5. UTILITIES ---
+
+        function switchView(view) {
+            currentView = view;
+            const customerView = document.getElementById('customer-view');
+            const adminView = document.getElementById('admin-view');
+            const btnCustomer = document.getElementById('btn-view-customer');
+            const btnAdmin = document.getElementById('btn-view-admin');
+            const btnCartNav = document.getElementById('btn-cart-nav');
+
+            if (view === 'customer') {
+                customerView.classList.remove('hidden');
+                adminView.classList.add('hidden');
+                btnCartNav.classList.remove('hidden');
+                
+                // Styling active button
+                btnCustomer.classList.add('bg-white', 'text-coffee');
+                btnCustomer.classList.remove('text-white', 'hover:bg-white/10');
+                btnAdmin.classList.add('text-white', 'hover:bg-white/10');
+                btnAdmin.classList.remove('bg-white', 'text-coffee');
+                
+                // Refresh data if customer view is opened
+                renderCustomerOrders();
+            } else {
+                customerView.classList.add('hidden');
+                adminView.classList.remove('hidden');
+                btnCartNav.classList.add('hidden'); // Hide cart icon in admin
+                
+                // Styling active button
+                btnAdmin.classList.add('bg-white', 'text-coffee');
+                btnAdmin.classList.remove('text-white', 'hover:bg-white/10');
+                btnCustomer.classList.add('text-white', 'hover:bg-white/10');
+                btnCustomer.classList.remove('bg-white', 'text-coffee');
+
+                // Refresh data
+                renderAdminOrders();
+            }
+
+            // Memperbarui UI Chat berdasarkan view yang sedang aktif
+            updateChatBadge();
+            if (isChatOpen) {
+                renderChat();
+                scrollToBottomChat();
+            }
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            // Colors based on type
+            let bgClass, iconClass;
+            if (type === 'success') { bgClass = 'bg-green-600'; iconClass = 'fa-check-circle'; }
+            else if (type === 'error') { bgClass = 'bg-red-600'; iconClass = 'fa-exclamation-circle'; }
+            else { bgClass = 'bg-blue-600'; iconClass = 'fa-info-circle'; } // info
+            
+            toast.className = `flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium ${bgClass} toast-enter`;
+            toast.innerHTML = `<i class="fa-solid ${iconClass} text-lg"></i> <span>${message}</span>`;
+            
+            container.appendChild(toast);
+
+            // Remove toast after 3 seconds
+            setTimeout(() => {
+                toast.classList.replace('toast-enter', 'toast-exit');
+                setTimeout(() => toast.remove(), 300); // Wait for exit animation
+            }, 3000);
+        }
+
+        // --- 6. FUNGSI CHAT ---
+
+        function toggleChat() {
+            isChatOpen = !isChatOpen;
+            const panel = document.getElementById('chat-panel');
+            
+            if (isChatOpen) {
+                panel.classList.remove('hidden');
+                // Beri jeda kecil agar transisi CSS berjalan mulus
+                setTimeout(() => {
+                    panel.classList.remove('chat-close');
+                    panel.classList.add('chat-open');
+                }, 10);
+                
+                unreadCount[currentView] = 0; // Reset notifikasi baca
+                updateChatBadge();
+                renderChat();
+                setTimeout(scrollToBottomChat, 50);
+            } else {
+                panel.classList.remove('chat-open');
+                panel.classList.add('chat-close');
+                setTimeout(() => panel.classList.add('hidden'), 300);
+            }
+        }
+
+        function renderChat() {
+            const container = document.getElementById('chat-messages');
+            const title = document.getElementById('chat-title');
+            
+            title.textContent = currentView === 'customer' ? 'Bantuan Pelanggan' : 'Live Chat (Admin)';
+
+            if (chatMessages.length === 0) {
+                container.innerHTML = `<div class="text-center text-xs text-gray-400 my-4 bg-white/50 py-2 rounded-lg">Belum ada percakapan</div>`;
+                return;
+            }
+
+            container.innerHTML = chatMessages.map(msg => {
+                const isMe = (currentView === 'customer' && msg.sender === 'customer') || 
+                             (currentView === 'admin' && msg.sender === 'admin');
+                
+                const time = formatTime(msg.timestamp);
+                
+                if (isMe) {
+                    return `
+                        <div class="flex flex-col items-end self-end max-w-[85%]">
+                            <div class="bg-amber-500 text-white px-3 py-2 rounded-2xl rounded-tr-sm text-sm shadow-sm whitespace-pre-wrap break-words">${msg.text}</div>
+                            <span class="text-[10px] text-gray-400 mt-1">${time}</span>
+                        </div>
+                    `;
+                } else {
+                    const senderName = msg.sender === 'admin' ? 'Admin Senja' : 'Pelanggan';
+                    const bgClass = msg.sender === 'admin' ? 'bg-white border border-gray-200' : 'bg-coffee-light text-white border border-coffee';
+                    const textClass = msg.sender === 'admin' ? 'text-gray-800' : 'text-white';
+                    
+                    return `
+                        <div class="flex flex-col items-start self-start max-w-[85%]">
+                            <span class="text-[10px] text-gray-500 mb-1 ml-1 font-medium">${senderName}</span>
+                            <div class="${bgClass} ${textClass} px-3 py-2 rounded-2xl rounded-tl-sm text-sm shadow-sm whitespace-pre-wrap break-words">${msg.text}</div>
+                            <span class="text-[10px] text-gray-400 mt-1">${time}</span>
+                        </div>
+                    `;
+                }
+            }).join('');
+        }
+
+        function scrollToBottomChat() {
+            const container = document.getElementById('chat-messages');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function handleChatKeyPress(e) {
+            if (e.key === 'Enter') sendMessage();
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if (!text) return;
+
+            const newMsg = {
+                id: Date.now(),
+                sender: currentView,
+                text: text,
+                timestamp: new Date().toISOString()
+            };
+
+            chatMessages.push(newMsg);
+            input.value = '';
+            
+            // Tambahkan unread ke pihak penerima
+            const receiver = currentView === 'customer' ? 'admin' : 'customer';
+            unreadCount[receiver]++;
+            
+            if (isChatOpen) {
+                renderChat();
+                scrollToBottomChat();
+            }
+            updateChatBadge();
+        }
+
+        function updateChatBadge() {
+            const badge = document.getElementById('chat-badge');
+            const count = unreadCount[currentView];
+            
+            if (count > 0 && !isChatOpen) {
+                badge.textContent = count;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        // --- 7. INITIALIZATION ---
+        window.onload = () => {
+            renderMenu();
+            renderCustomerOrders();
+            renderAdminOrders();
+            updateCartUI();
+            updateChatBadge();
+        };
+
+    </script>
+</body>
+</html>
